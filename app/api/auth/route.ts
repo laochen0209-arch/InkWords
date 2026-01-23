@@ -3,6 +3,17 @@ import prisma from '@/lib/prisma'
 
 const UNIVERSAL_VERIFICATION_CODE = '123456'
 
+async function testDatabaseConnection() {
+  try {
+    await prisma.$connect()
+    console.log('[AUTH API] 数据库连接测试成功')
+    return true
+  } catch (error: any) {
+    console.error('[AUTH API] 数据库连接测试失败:', error)
+    return false
+  }
+}
+
 export async function POST(request: NextRequest) {
   console.log('[AUTH API] 收到请求')
 
@@ -32,6 +43,17 @@ export async function POST(request: NextRequest) {
 
     console.log('[AUTH API] 验证码正确，开始数据库操作')
     console.log('[AUTH API] 邮箱:', email)
+
+    console.log('[AUTH API] 测试数据库连接...')
+    const isConnected = await testDatabaseConnection()
+    
+    if (!isConnected) {
+      console.error('[AUTH API] 数据库连接失败')
+      return NextResponse.json(
+        { error: '数据库连接失败，请联系管理员配置 Vercel 环境变量 DATABASE_URL' },
+        { status: 500 }
+      )
+    }
 
     console.log('[AUTH API] 执行 prisma.user.upsert')
     const user = await prisma.user.upsert({
@@ -70,7 +92,11 @@ export async function POST(request: NextRequest) {
     console.error('[AUTH API] 错误类型:', error?.constructor?.name)
     console.error('[AUTH API] 错误消息:', error?.message || String(error))
     
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    let errorMessage = error instanceof Error ? error.message : String(error)
+    
+    if (errorMessage.includes('Can\'t reach database server') || errorMessage.includes('Unable to establish connection')) {
+      errorMessage = '数据库连接失败，请检查 Vercel 环境变量 DATABASE_URL 是否正确配置'
+    }
     
     console.log('[AUTH API] 返回错误响应:', errorMessage)
     
