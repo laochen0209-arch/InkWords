@@ -8,12 +8,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-/**
- * 用户模型
- * 存储用户基本信息、积分、连续签到天数等
- */
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -27,10 +24,6 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-/**
- * 练习日志模型
- * 记录用户的练习成绩、模式、时间等
- */
 model PracticeLog {
   id        String   @id @default(cuid())
   userId    String
@@ -42,10 +35,6 @@ model PracticeLog {
   @@index([userId])
 }
 
-/**
- * 生词本模型
- * 存储用户收藏的单词和句子
- */
 model MistakeBook {
   id        String   @id @default(cuid())
   userId    String
@@ -57,10 +46,6 @@ model MistakeBook {
   @@index([userId])
 }
 
-/**
- * 词汇表模型
- * 存储学习词汇
- */
 model Vocabulary {
   id          String   @id @default(cuid())
   english     String
@@ -75,10 +60,6 @@ model Vocabulary {
   @@index([english])
 }
 
-/**
- * 句子表模型
- * 存储学习句子
- */
 model Sentence {
   id          String   @id @default(cuid())
   contentEn   String   @map("content_en")
@@ -91,10 +72,6 @@ model Sentence {
   @@index([author])
 }
 
-/**
- * 文库文章模型
- * 存储文库文章
- */
 model Article {
   id          String   @id @default(cuid())
   titleEn     String   @map("title_en")

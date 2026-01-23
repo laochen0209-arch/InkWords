@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { cn } from "@/lib/utils"
 import { Search, X } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { InkLoading } from "@/components/library/ink-loading"
 
 const historyTags = [
   "Serendipity",
@@ -25,7 +24,7 @@ const trendingTags = [
   "清风明月",
 ]
 
-export default function SearchOverlay() {
+function SearchOverlayContent() {
   const [searchValue, setSearchValue] = useState("")
   const [isVisible, setIsVisible] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
@@ -252,5 +251,13 @@ export default function SearchOverlay() {
         <div className="h-[env(safe-area-inset-bottom,20px)]" />
       </div>
     </main>
+  )
+}
+
+export default function SearchOverlay() {
+  return (
+    <Suspense fallback={<div className="fixed inset-0 bg-[#FDFBF7]" />}>
+      <SearchOverlayContent />
+    </Suspense>
   )
 }
