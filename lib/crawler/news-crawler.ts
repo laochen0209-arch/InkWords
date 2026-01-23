@@ -21,48 +21,8 @@ interface ArticleItem {
   category: string
 }
 
-async function checkDailyLimit(): Promise<boolean> {
-  try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    
-    const newsCount = await prisma.news.count({
-      where: {
-        createdAt: {
-          gte: today,
-          lt: tomorrow
-        }
-      }
-    })
-    
-    const articleCount = await prisma.article.count({
-      where: {
-        createdAt: {
-          gte: today,
-          lt: tomorrow
-        }
-      }
-    })
-    
-    console.log(`[LIMIT] 今日已爬取：新闻 ${newsCount}，文章 ${articleCount}`)
-    
-    return newsCount >= MAX_NEWS_PER_DAY || articleCount >= MAX_ARTICLES_PER_DAY
-  } catch (error) {
-    console.error('[LIMIT] 检查每日限制失败:', error)
-    return false
-  }
-}
-
 export async function crawlNews(): Promise<{ count: number; items: NewsItem[] }> {
   console.log('[CRAWLER] 开始爬取新闻')
-  
-  if (await checkDailyLimit()) {
-    console.log('[CRAWLER] 已达到每日爬取限制')
-    return { count: 0, items: [] }
-  }
   
   const newsSources = [
     {
@@ -147,11 +107,6 @@ export async function crawlNews(): Promise<{ count: number; items: NewsItem[] }>
 
 export async function crawlArticles(): Promise<{ count: number; items: ArticleItem[] }> {
   console.log('[CRAWLER] 开始爬取文章')
-  
-  if (await checkDailyLimit()) {
-    console.log('[CRAWLER] 已达到每日爬取限制')
-    return { count: 0, items: [] }
-  }
   
   const articleSources = [
     {
