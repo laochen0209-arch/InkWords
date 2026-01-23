@@ -4,6 +4,6 @@
   "installCommand": "npm install",
   "crons": [{
     "path": "/api/crawler/schedule",
-    "schedule": "0 * * * *"
+    "schedule": "0 */12 * * *"
   }]
 }
