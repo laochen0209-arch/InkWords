@@ -1,5 +1,5 @@
 // This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// learn more about it in docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -55,7 +55,7 @@ model Vocabulary {
   exampleZh   String   @map("example_zh")
   difficulty   Int
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
   @@index([english])
 }
@@ -67,7 +67,7 @@ model Sentence {
   pinyin      String
   author      String
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
   @@index([author])
 }
@@ -80,7 +80,49 @@ model Article {
   contentZh   String   @map("content_zh")
   category    String
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
   @@index([category])
+}
+
+model News {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  source      String
+  category    String
+  imageUrl   String?
+  url         String   @unique
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, publishedAt])
+}
+
+model CrawlerLog {
+  id          String   @id @default(cuid())
+  source      String
+  status      String
+  articleCount Int      @default(0)
+  error       String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source, status])
+}
+
+model CrawlerConfig {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  url         String
+  selector    String
+  category    String
+  enabled     Boolean  @default(true)
+  interval    Int      @default(3600)
+  lastRunAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
