@@ -12,15 +12,17 @@ import { TRANSLATIONS } from "@/lib/i18n"
 export default function DashboardPage() {
   const { learningMode } = useLanguage()
   const toast = useToast()
+  const [user, setUser] = useState<any>(null)
   const [greeting, setGreeting] = useState("")
   const [isCheckedIn, setIsCheckedIn] = useState(false)
-  const [streakDays, setStreakDays] = useState(12)
+  const [streakDays, setStreakDays] = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
   const [stats, setStats] = useState({
-    timeSpent: 25,
-    wordsLearned: 12,
-    sentencesMastered: 3
+    timeSpent: 0,
+    wordsLearned: 0,
+    sentencesMastered: 0
   })
+  const [isLoading, setIsLoading] = useState(true)
 
   const t = TRANSLATIONS[learningMode]
 
@@ -42,29 +44,53 @@ export default function DashboardPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('/api/user/me')
+        const data = await response.json()
+        
+        if (response.ok && data.user) {
+          setUser(data.user)
+          setStreakDays(data.user.streak || 0)
+          setStats({
+            timeSpent: data.user.points || 0,
+            wordsLearned: data.user.points || 0,
+            sentencesMastered: 0
+          })
+        }
+      } catch (error) {
+        console.error('获取用户数据失败:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true"
+    if (isLoggedIn) {
+      fetchUserData()
+    } else {
+      setIsLoading(false)
+    }
+  }, [])
+
   const handleCheckIn = () => {
     if (isCheckedIn) return
-
     setIsCheckedIn(true)
     setStreakDays(streakDays + 1)
     localStorage.setItem("inkwords_checked_in_today", "true")
     localStorage.setItem("inkwords_streak_days", String(streakDays + 1))
-
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 3000)
-
     toast.success(t.dashboard.checkIn.success)
   }
 
   return (
     <main className="min-h-screen">
-      {/* Layer 1: 固定背景层 - 水墨山水 */}
       <div 
         className="fixed inset-0 z-0 bg-ink-paper ink-landscape-bg"
         aria-hidden="true"
       />
-
-      {/* Layer 2: 彩带动画 */}
       <AnimatePresence>
         {showConfetti && (
           <motion.div
@@ -99,12 +125,9 @@ export default function DashboardPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Layer 3: 可滚动内容区 - 垂直居中 */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-4xl mx-auto space-y-6">
           
-          {/* 早安问候 - 大号衬线体，悬浮在山水之上 */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -118,8 +141,7 @@ export default function DashboardPage() {
               {learningMode === "LEARN_CHINESE" ? "今天也要继续加油哦！" : "Keep up the great work today!"}
             </p>
           </motion.div>
-
-          {/* 玻璃拟态签到卡片 */}
+          
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -168,8 +190,7 @@ export default function DashboardPage() {
               )}
             </button>
           </motion.div>
-
-          {/* 玻璃拟态数据概览卡片 */}
+          
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -218,8 +239,7 @@ export default function DashboardPage() {
               </motion.div>
             </div>
           </motion.div>
-
-          {/* 主行动按钮 - 巨大的红色圆形/胶囊按钮 */}
+          
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
