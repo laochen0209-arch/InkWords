@@ -53,7 +53,7 @@ export default function RegisterPage() {
         }, 1000)
       } else {
         console.error("发送验证码失败:", data)
-        const errorMessage = data.error || data.message || '发送验证码失败'
+        const errorMessage = data.error || data.message || '发送验证码失败，请检查输入'
         toast.error(errorMessage)
       }
     } catch (error) {
@@ -98,7 +98,7 @@ export default function RegisterPage() {
         }, 500)
       } else {
         console.error("注册失败:", data)
-        const errorMessage = data.error || data.message || t.auth.register_btn + "失败"
+        const errorMessage = data.error || data.message || '注册失败，请检查输入'
         toast.error(errorMessage)
       }
     } catch (error) {

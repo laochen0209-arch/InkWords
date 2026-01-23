@@ -53,7 +53,7 @@ export default function LoginPage() {
         }, 1000)
       } else {
         console.error("发送验证码失败:", data)
-        const errorMessage = data.error || data.message || '发送验证码失败'
+        const errorMessage = data.error || data.message || '发送验证码失败，请检查输入'
         toast.error(errorMessage)
       }
     } catch (error) {
@@ -98,7 +98,7 @@ export default function LoginPage() {
         }, 500)
       } else {
         console.error("登录失败:", data)
-        const errorMessage = data.error || data.message || t.auth.login_btn + "失败"
+        const errorMessage = data.error || data.message || '登录失败，请检查输入'
         toast.error(errorMessage)
       }
     } catch (error) {
