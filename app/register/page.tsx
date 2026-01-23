@@ -8,32 +8,69 @@ import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 
 export default function RegisterPage() {
-  const [username, setUsername] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
+  const [phone, setPhone] = useState("")
+  const [code, setCode] = useState("")
+  const [countdown, setCountdown] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSendingCode, setIsSendingCode] = useState(false)
   const router = useRouter()
   const toast = useToast()
   const { learningMode } = useLanguage()
 
   const t = TRANSLATIONS[learningMode]
 
+  const handleGetCode = async () => {
+    if (countdown > 0 || !phone) return
+    
+    setIsSendingCode(true)
+    try {
+      const response = await fetch('/api/send-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone }),
+      })
+
+      const data = await response.json()
+
+      if (response.status === 200) {
+        toast.success('验证码已发送，请查看控制台')
+        console.log('='.repeat(50))
+        console.log('📱 前端提示：验证码已发送')
+        console.log('🔑 请在服务器控制台查看验证码')
+        console.log('='.repeat(50))
+        
+        setCountdown(60)
+        const timer = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer)
+              return 0
+            }
+            return prev - 1
+          })
+        }, 1000)
+      } else {
+        toast.error(data.error || '发送验证码失败')
+      }
+    } catch (error) {
+      console.error('发送验证码失败:', error)
+      toast.error('发送验证码失败')
+    } finally {
+      setIsSendingCode(false)
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
-    if (!username || !email || !password || !confirmPassword) {
-      toast.error(t.auth.email_label + " " + t.auth.password_label + " " + t.auth.confirm_password_label)
-      return
-    }
-    
-    if (password !== confirmPassword) {
-      toast.error(t.auth.password_label + " " + t.auth.confirm_password_label + " " + t.auth.password_label + "不匹配")
+    if (!phone || !code) {
+      toast.error(t.auth.email_label + "和" + t.auth.password_label + "不能为空")
       return
     }
     
     setIsLoading(true)
-
     try {
       const response = await fetch('/api/auth', {
         method: 'POST',
@@ -41,15 +78,15 @@ export default function RegisterPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email,
-          password: password,
+          email: phone,
+          password: code,
         }),
       })
 
       const data = await response.json()
 
       if (response.status === 200) {
-        toast.success(t.auth.register_btn + " " + t.welcome.slogan)
+        toast.success(t.auth.register_btn + "成功")
         
         localStorage.setItem("isLoggedIn", "true")
         localStorage.setItem("inkwords_user", JSON.stringify(data.user))
@@ -59,12 +96,12 @@ export default function RegisterPage() {
         }, 500)
       } else {
         console.error("注册失败:", data)
-        toast.error(data.error || t.auth.register_btn + " " + t.auth.no_account)
-        setIsLoading(false)
+        toast.error(data.error || t.auth.register_btn + "失败")
       }
     } catch (error) {
       console.error("注册失败:", error)
-      toast.error(t.auth.register_btn + " " + t.auth.no_account)
+      toast.error(t.auth.register_btn + "失败")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -90,56 +127,44 @@ export default function RegisterPage() {
             onSubmit={handleRegister}
           >
             <div className="space-y-2">
-              <label htmlFor="username" className="sr-only">{t.auth.username_label}</label>
+              <label htmlFor="phone" className="sr-only">{t.auth.email_label}</label>
               <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={t.auth.username_label}
-                className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
-                autoComplete="username"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="email" className="sr-only">{t.auth.email_label}</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 placeholder={t.auth.email_label}
                 className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
-                autoComplete="email"
+                autoComplete="tel"
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="sr-only">{t.auth.password_label}</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t.auth.password_label}
-                className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="sr-only">{t.auth.confirm_password_label}</label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder={t.auth.confirm_password_label}
-                className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
-                autoComplete="new-password"
-              />
+              <label htmlFor="code" className="sr-only">{t.auth.password_label}</label>
+              <div className="relative">
+                <input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder={t.auth.password_label}
+                  maxLength={6}
+                  className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 pr-24 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
+                  autoComplete="one-time-code"
+                />
+                <button
+                  type="button"
+                  onClick={handleGetCode}
+                  disabled={countdown > 0 || !phone || isSendingCode}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-sm font-serif text-ink-vermilion hover:text-ink-vermilion/80 disabled:text-ink-gray/40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSendingCode ? '发送中...' : countdown > 0 ? `${countdown}s` : '获取验证码'}
+                </button>
+              </div>
             </div>
             <button
               type="submit"
-              disabled={!username || !email || !password || !confirmPassword || isLoading}
+              disabled={!phone || !code || isLoading}
               className="w-full mt-8 py-3.5 bg-[#C23E32] text-white font-serif text-base tracking-wider rounded-full shadow-md hover:bg-[#A33428] disabled:bg-ink-gray/30 disabled:shadow-none disabled:cursor-not-allowed transition-all duration-200"
             >
               {isLoading ? t.auth.register_btn + "..." : t.auth.register_btn}

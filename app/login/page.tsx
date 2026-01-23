@@ -12,31 +12,61 @@ export default function LoginPage() {
   const [code, setCode] = useState("")
   const [countdown, setCountdown] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSendingCode, setIsSendingCode] = useState(false)
   const router = useRouter()
   const toast = useToast()
   const { learningMode, nativeLang } = useLanguage()
 
   const t = TRANSLATIONS[learningMode]
 
-  const handleGetCode = () => {
+  const handleGetCode = async () => {
     if (countdown > 0 || !phone) return
-    setCountdown(60)
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          return 0
-        }
-        return prev - 1
+    
+    setIsSendingCode(true)
+    try {
+      const response = await fetch('/api/send-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone }),
       })
-    }, 1000)
+
+      const data = await response.json()
+
+      if (response.status === 200) {
+        toast.success('验证码已发送，请查看控制台')
+        console.log('='.repeat(50))
+        console.log('📱 前端提示：验证码已发送')
+        console.log('🔑 请在服务器控制台查看验证码')
+        console.log('='.repeat(50))
+        
+        setCountdown(60)
+        const timer = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer)
+              return 0
+            }
+            return prev - 1
+          })
+        }, 1000)
+      } else {
+        toast.error(data.error || '发送验证码失败')
+      }
+    } catch (error) {
+      console.error('发送验证码失败:', error)
+      toast.error('发送验证码失败')
+    } finally {
+      setIsSendingCode(false)
+    }
   }
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
     if (!phone || !code) {
-      toast.error(t.auth.email_label + " " + t.auth.password_label)
+      toast.error(t.auth.email_label + "和" + t.auth.password_label + "不能为空")
       return
     }
     
@@ -56,7 +86,7 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (response.status === 200) {
-        toast.success(t.auth.login_btn + " " + t.welcome.slogan)
+        toast.success(t.auth.login_btn + "成功")
         
         localStorage.setItem("isLoggedIn", "true")
         localStorage.setItem("inkwords_user", JSON.stringify(data.user))
@@ -66,11 +96,11 @@ export default function LoginPage() {
         }, 500)
       } else {
         console.error("登录失败:", data)
-        toast.error(data.error || t.auth.login_btn + " " + t.auth.no_account)
+        toast.error(data.error || t.auth.login_btn + "失败")
       }
     } catch (error) {
       console.error("登录失败:", error)
-      toast.error(t.auth.login_btn + " " + t.auth.no_account)
+      toast.error(t.auth.login_btn + "失败")
     } finally {
       setIsLoading(false)
     }
@@ -149,10 +179,10 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleGetCode}
-                  disabled={countdown > 0 || !phone}
+                  disabled={countdown > 0 || !phone || isSendingCode}
                   className="absolute right-0 top-1/2 -translate-y-1/2 text-sm font-serif text-ink-vermilion hover:text-ink-vermilion/80 disabled:text-ink-gray/40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {countdown > 0 ? `${countdown}s` : t.auth.password_label}
+                  {isSendingCode ? '发送中...' : countdown > 0 ? `${countdown}s` : '获取验证码'}
                 </button>
               </div>
             </div>
