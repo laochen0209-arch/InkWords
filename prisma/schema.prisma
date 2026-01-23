@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * 用户模型
+ * 存储用户基本信息、积分、连续签到天数等
+ */
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String?
+  name      String?
+  avatar    String?
+  points    Int      @default(0)
+  streak    Int      @default(0)
+  lastLoginDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * 练习日志模型
+ * 记录用户的练习成绩、模式、时间等
+ */
+model PracticeLog {
+  id        String   @id @default(cuid())
+  userId    String
+  score     Int
+  mode      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/**
+ * 生词本模型
+ * 存储用户收藏的单词和句子
+ */
+model MistakeBook {
+  id        String   @id @default(cuid())
+  userId    String
+  word       String
+  context    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/**
+ * 词汇表模型
+ * 存储学习词汇
+ */
+model Vocabulary {
+  id          String   @id @default(cuid())
+  english     String
+  chinese     String
+  pinyin      String
+  exampleEn   String   @map("example_en")
+  exampleZh   String   @map("example_zh")
+  difficulty   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([english])
+}
+
+/**
+ * 句子表模型
+ * 存储学习句子
+ */
+model Sentence {
+  id          String   @id @default(cuid())
+  contentEn   String   @map("content_en")
+  contentZh   String   @map("content_zh")
+  pinyin      String
+  author      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([author])
+}
+
+/**
+ * 文库文章模型
+ * 存储文库文章
+ */
+model Article {
+  id          String   @id @default(cuid())
+  titleEn     String   @map("title_en")
+  titleZh     String   @map("title_zh")
+  contentEn   String   @map("content_en")
+  contentZh   String   @map("content_zh")
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}

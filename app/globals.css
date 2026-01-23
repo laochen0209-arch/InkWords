@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&display=swap');
+@import "tailwindcss";
+
+/* 墨语 InkWords - 新中式极简主义设计系统 */
+:root {
+  /* 核心色彩 - 墨语配色 */
+  --ink-paper: #FDFBF7;
+  --ink-black: #2B2B2B;
+  --ink-gray: #787878;
+  --ink-vermilion: #C23E32;
+  --ink-bamboo: #7A9078;
+  
+  /* 映射到设计系统 tokens */
+  --background: #FDFBF7;
+  --foreground: #2B2B2B;
+  --card: #FDFBF7;
+  --card-foreground: #2B2B2B;
+  --popover: #FDFBF7;
+  --popover-foreground: #2B2B2B;
+  --primary: #C23E32;
+  --primary-foreground: #FDFBF7;
+  --secondary: #F5F2EC;
+  --secondary-foreground: #2B2B2B;
+  --muted: #F5F2EC;
+  --muted-foreground: #787878;
+  --accent: #C23E32;
+  --accent-foreground: #FDFBF7;
+  --success: #7A9078;
+  --success-foreground: #FDFBF7;
+  --destructive: #C23E32;
+  --destructive-foreground: #FDFBF7;
+  --border: #E8E4DC;
+  --input: #F5F2EC;
+  --ring: #C23E32;
+  --radius: 0;
+}
+
+@theme inline {
+  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-serif: 'Noto Serif SC', 'Noto Serif SC Fallback', serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
+  
+  --color-ink-paper: var(--ink-paper);
+  --color-ink-black: var(--ink-black);
+  --color-ink-gray: var(--ink-gray);
+  --color-ink-vermilion: var(--ink-vermilion);
+  --color-ink-bamboo: var(--ink-bamboo);
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+body {
+  color: #2b2b2b;
+  background-color: #Fdfbf7;
+  background-image: url('/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(253, 251, 247, 0.9);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.ink-landscape-bg {
+  background-image: url('/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 盖章动画 */
+@keyframes stamp {
+  0% { transform: scale(1.2) rotate(-5deg); opacity: 0.5; }
+  50% { transform: scale(0.95) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.animate-stamp {
+  animation: stamp 0.3s ease-out forwards;
+}
+
+/* 墨水晕染动画 - 用于选项选中效果 */
+@keyframes ink-spread {
+  0% { 
+    transform: scale(0.9); 
+    opacity: 0.7;
+    box-shadow: 0 0 0 0 rgba(194, 62, 50, 0.4);
+  }
+  50% { 
+    transform: scale(1.02);
+    box-shadow: 0 0 8px 2px rgba(194, 62, 50, 0.2);
+  }
+  100% { 
+    transform: scale(1); 
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(194, 62, 50, 0);
+  }
+}
+
+.animate-ink-spread {
+  animation: ink-spread 0.4s ease-out forwards;
+}

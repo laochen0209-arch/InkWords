@@ -1,0 +1,266 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 墨语 InkWords - 新中式极简主义设计系统 */
+:root {
+  /* 核心色彩 - 墨语配色 */
+  --ink-paper: #FDFBF7;
+  --ink-black: #2B2B2B;
+  --ink-gray: #787878;
+  --ink-vermilion: #C23E32;
+  --ink-bamboo: #7A9078;
+  
+  /* 映射到设计系统 tokens */
+  --background: #FDFBF7;
+  --foreground: #2B2B2B;
+  --card: #FDFBF7;
+  --card-foreground: #2B2B2B;
+  --popover: #FDFBF7;
+  --popover-foreground: #2B2B2B;
+  --primary: #C23E32;
+  --primary-foreground: #FDFBF7;
+  --secondary: #F5F2EC;
+  --secondary-foreground: #2B2B2B;
+  --muted: #F5F2EC;
+  --muted-foreground: #787878;
+  --accent: #C23E32;
+  --accent-foreground: #FDFBF7;
+  --success: #7A9078;
+  --success-foreground: #FDFBF7;
+  --destructive: #C23E32;
+  --destructive-foreground: #FDFBF7;
+  --border: #E8E4DC;
+  --input: #F5F2EC;
+  --ring: #C23E32;
+  --radius: 0;
+  
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  --shadow-ink: 0 4px 20px rgba(43, 43, 43, 0.08);
+  --shadow-ink-hover: 0 8px 30px rgba(43, 43, 43, 0.12);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-serif: 'Noto Serif SC', 'Noto Serif SC Fallback', serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
+  
+  --color-ink-paper: var(--ink-paper);
+  --color-ink-black: var(--ink-black);
+  --color-ink-gray: var(--ink-gray);
+  --color-ink-vermilion: var(--ink-vermilion);
+  --color-ink-bamboo: var(--ink-bamboo);
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  
+  --animate-in: enter 0.2s ease-out;
+  --animate-out: exit 0.2s ease-in;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Animation keyframes for shadcn/ui components */
+@keyframes enter {
+  from { opacity: var(--tw-enter-opacity, 0); transform: translate(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0)) scale(var(--tw-enter-scale, 1)); }
+  to { opacity: var(--tw-enter-opacity, 1); transform: translate(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0)) scale(var(--tw-enter-scale, 1)); }
+}
+
+@keyframes exit {
+  from { opacity: var(--tw-exit-opacity, 1); transform: translate(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0)) scale(var(--tw-exit-scale, 1)); }
+  to { opacity: var(--tw-exit-opacity, 0); transform: translate(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0)) scale(var(--tw-exit-scale, 1)); }
+}
+
+/* Animation utilities */
+/* These are now mostly handled by tw-animate-css, but keeping explicit calls for clarity.
+   Variables like --tw-enter-opacity are set by Tailwind utility classes. */
+.animate-in {
+  animation: enter var(--animate-duration, 200ms) var(--animate-easing, ease-out);
+}
+
+.animate-out {
+  animation: exit var(--animate-duration, 200ms) var(--animate-easing, ease-in);
+}
+
+/* These classes are typically provided by tw-animate-css or Tailwind config,
+   but are included here for direct variable definition if not configured via plugin. */
+.fade-in-0 { --tw-enter-opacity: 0; }
+.fade-out-0 { --tw-exit-opacity: 0; }
+.fade-out-80 { --tw-exit-opacity: 0.8; }
+.zoom-in-95 { --tw-enter-scale: 0.95; }
+.zoom-in-90 { --tw-enter-scale: 0.9; }
+.zoom-out-95 { --tw-exit-scale: 0.95; }
+.slide-in-from-top-2 { --tw-enter-translate-y: -0.5rem; }
+.slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
+.slide-in-from-left-2 { --tw-enter-translate-x: -0.5rem; }
+.slide-in-from-right-2 { --tw-enter-translate-x: 0.5rem; }
+.slide-in-from-top-full { --tw-enter-translate-y: -100%; }
+.slide-in-from-bottom-full { --tw-enter-translate-y: 100%; }
+.slide-in-from-left-52 { --tw-enter-translate-x: -13rem; }
+.slide-in-from-right-52 { --tw-enter-translate-x: 13rem; }
+.slide-in-from-left { --tw-enter-translate-x: -100%; }
+.slide-in-from-right { --tw-enter-translate-x: 100%; }
+.slide-in-from-top { --tw-enter-translate-y: -100%; }
+.slide-in-from-bottom { --tw-enter-translate-y: 100%; }
+.slide-out-to-top { --tw-exit-translate-y: -100%; }
+.slide-out-to-bottom { --tw-exit-translate-y: 100%; }
+.slide-out-to-left { --tw-exit-translate-x: -100%; }
+.slide-out-to-right { --tw-exit-translate-x: 100%; }
+.slide-out-to-right-full { --tw-exit-translate-x: 100%; }
+.slide-out-to-left-52 { --tw-exit-translate-x: -13rem; }
+.slide-out-to-right-52 { --tw-exit-translate-x: 13rem; }
+/* Note: fade-in and fade-out are simple utility classes usually not part of animated transitions */
+.fade-in { opacity: 1; }
+.fade-out { opacity: 0; }
+
+/* 墨语水墨山水背景 */
+.ink-landscape-bg {
+  position: relative;
+  background-color: var(--ink-paper);
+}
+
+.ink-landscape-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('/images/ink-landscape-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  opacity: 0.10;
+  filter: blur(1px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ink-landscape-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 盖章动画 */
+@keyframes stamp {
+  0% { transform: scale(1.2) rotate(-5deg); opacity: 0.5; }
+  50% { transform: scale(0.95) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.animate-stamp {
+  animation: stamp 0.3s ease-out forwards;
+}
+
+/* 墨水晕染动画 - 用于选项选中效果 */
+@keyframes ink-spread {
+  0% { 
+    transform: scale(0.9); 
+    opacity: 0.7;
+    box-shadow: 0 0 0 0 rgba(194, 62, 50, 0.4);
+  }
+  50% { 
+    transform: scale(1.02);
+    box-shadow: 0 0 8px 2px rgba(194, 62, 50, 0.2);
+  }
+  100% { 
+    transform: scale(1); 
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(194, 62, 50, 0);
+  }
+}
+
+.animate-ink-spread {
+  animation: ink-spread 0.4s ease-out forwards;
+}
