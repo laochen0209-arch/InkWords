@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
       },
       create: {
         email,
-        password: UNIVERSAL_VERIFICATION_CODE,
         points: 0,
         streak: 0,
         lastLoginDate: new Date()
@@ -96,6 +95,10 @@ export async function POST(request: NextRequest) {
     
     if (errorMessage.includes('Can\'t reach database server') || errorMessage.includes('Unable to establish connection')) {
       errorMessage = '数据库连接失败，请检查 Vercel 环境变量 DATABASE_URL 是否正确配置'
+    }
+    
+    if (errorMessage.includes('column `password` does not exist')) {
+      errorMessage = '数据库表结构不匹配，请联系管理员检查 User 表结构'
     }
     
     console.log('[AUTH API] 返回错误响应:', errorMessage)
