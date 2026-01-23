@@ -34,7 +34,7 @@ export default function RegisterPage() {
 
       const data = await response.json()
 
-      if (response.status === 200) {
+      if (response.ok) {
         toast.success('验证码已发送，请查看控制台')
         console.log('='.repeat(50))
         console.log('📱 前端提示：验证码已发送')
@@ -52,7 +52,9 @@ export default function RegisterPage() {
           })
         }, 1000)
       } else {
-        toast.error(data.error || '发送验证码失败')
+        console.error("发送验证码失败:", data)
+        const errorMessage = data.error || data.message || '发送验证码失败'
+        toast.error(errorMessage)
       }
     } catch (error) {
       console.error('发送验证码失败:', error)
@@ -85,7 +87,7 @@ export default function RegisterPage() {
 
       const data = await response.json()
 
-      if (response.status === 200) {
+      if (response.ok) {
         toast.success(t.auth.register_btn + "成功")
         
         localStorage.setItem("isLoggedIn", "true")
@@ -96,7 +98,8 @@ export default function RegisterPage() {
         }, 500)
       } else {
         console.error("注册失败:", data)
-        toast.error(data.error || t.auth.register_btn + "失败")
+        const errorMessage = data.error || data.message || t.auth.register_btn + "失败"
+        toast.error(errorMessage)
       }
     } catch (error) {
       console.error("注册失败:", error)
