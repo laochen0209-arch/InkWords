@@ -1,9 +1,9 @@
 {
-  "buildCommand": "prisma generate",
+  "buildCommand": "prisma generate && next build",
   "devCommand": "next dev",
   "installCommand": "npm install",
   "crons": [{
     "path": "/api/crawler/schedule",
-    "schedule": "0 */12 * * *"
+    "schedule": "0 0 * * *"
   }]
 }
