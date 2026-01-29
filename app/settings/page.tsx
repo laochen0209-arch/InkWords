@@ -40,10 +40,12 @@ const settingsItems = [
   },
 ]
 
+type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in"
+
 export default function SettingsPage() {
   const router = useRouter()
   const [darkMode, setDarkMode] = useState(false)
-  const [activeTab, setActiveTab] = useState<"home" | "practice" | "library" | "profile">("profile")
+  const [activeTab, setActiveTab] = useState<TabType>("profile")
 
   const handleLogout = () => {
     if (confirm("确定要退出登录吗？")) {

@@ -17,6 +17,7 @@ interface ArticleCardProps {
   excerptEn?: string
   isRead: boolean
   watermark: WatermarkType
+  imageUrl?: string
   nativeLang?: NativeLang
   targetLang?: TargetLang
 }
@@ -86,6 +87,7 @@ export function ArticleCard({
   excerptEn,
   isRead, 
   watermark,
+  imageUrl,
   nativeLang = "zh",
   targetLang = "en"
 }: ArticleCardProps) {
@@ -98,6 +100,8 @@ export function ArticleCard({
    */
   const displayTitle = targetLang === "zh" ? title : (titleEn || title)
   const displayExcerpt = targetLang === "zh" ? excerpt : (excerptEn || excerpt)
+
+  const coverImage = (imageUrl && imageUrl.length > 5) ? imageUrl : "/images/default-cover.svg"
 
   return (
     <Link 
@@ -146,6 +150,21 @@ export function ArticleCard({
         
         {/* 内容区 */}
         <div className="pl-6 pr-16 py-4 w-full">
+          {/* 图片显示区 */}
+          {coverImage && coverImage !== "/images/default-cover.svg" && (
+            <div className="mb-3">
+              <img
+                src={coverImage}
+                alt={displayTitle}
+                className="w-full h-40 object-cover rounded-lg shadow-md"
+                onError={(e) => {
+                  e.currentTarget.src = "/images/default-cover.svg"
+                }}
+              />
+            </div>
+          )}
+
+          {/* 标题与作者 */}
           <div className="flex items-baseline gap-2 mb-2">
             <h3 className={cn(
               "font-serif text-base font-medium transition-colors duration-300 truncate",
@@ -158,6 +177,7 @@ export function ArticleCard({
             </span>
           </div>
           
+          {/* 摘要 */}
           <p className={cn(
             "text-sm leading-relaxed transition-colors duration-300 line-clamp-3",
             isPressed ? "text-[#C23E32]" : "text-ink-gray"

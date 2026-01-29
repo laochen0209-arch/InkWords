@@ -56,6 +56,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
      */
     const uiLang = mode === 'LEARN_CHINESE' ? 'en' : 'zh'
     setUiLanguage(uiLang)
+    localStorage.setItem("inkwords_ui_language", uiLang)
   }, [])
 
   /**
@@ -75,6 +76,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
          */
         const uiLang = savedLearningMode === 'LEARN_CHINESE' ? 'en' : 'zh'
         setUiLanguage(uiLang)
+        localStorage.setItem("inkwords_ui_language", uiLang)
       }
       if (settings.nativeLang) {
         setNativeLang(settings.nativeLang)
@@ -115,6 +117,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
     
     const uiLang = mode === 'LEARN_CHINESE' ? 'en' : 'zh'
     setUiLanguage(uiLang)
+    localStorage.setItem("inkwords_ui_language", uiLang)
     
     localStorage.setItem("inkwords_learning_mode", mode)
     localStorage.setItem("inkwords_native_lang", newNativeLang)

@@ -47,7 +47,21 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await fetch('/api/user/me')
+        const userStr = localStorage.getItem("inkwords_user")
+        const userData = userStr ? JSON.parse(userStr) : null
+
+        if (!userData?.email) {
+          console.error('用户邮箱不存在')
+          setIsLoading(false)
+          return
+        }
+
+        const response = await fetch('/api/user/me', {
+          headers: {
+            'x-user-email': userData.email
+          }
+        })
+        
         const data = await response.json()
         
         if (response.ok && data.user) {

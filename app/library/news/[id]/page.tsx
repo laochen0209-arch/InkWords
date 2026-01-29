@@ -1,412 +1,303 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { Loader2, Type, ArrowLeft, Volume2, Sparkles } from "lucide-react"
 import { motion } from "framer-motion"
-import { ReaderHeader } from "@/components/reader/reader-header"
-import { ReaderContent } from "@/components/reader/reader-content"
-import { BookmarkPlus, Play, Type } from "lucide-react"
-import { useToast } from "@/components/ink-toast/toast-context"
-import { getLanguageSettings, NativeLang, TargetLang } from "@/lib/language-utils"
+import { InteractiveParagraph } from "@/components/reader/interactive-paragraph"
 
-const newsContent = [
-  {
-    id: "1",
-    titleZh: "AI革命：机器学习如何改变语言学习",
-    titleEn: "AI Revolution: How Machine Learning is Transforming Language Learning",
-    categoryZh: "科技",
-    categoryEn: "Technology",
-    source: "Tech Daily",
-    time: "2小时前",
-    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&auto=format&fit=crop&q=80",
-    content: [
-      {
-        id: 1,
-        zh: "人工智能正在重塑我们进行语言教育的方式，提供个性化学习路径和实时反馈。",
-        en: "Artificial intelligence is reshaping how we approach language education, offering personalized learning paths and real-time feedback.",
-      },
-      {
-        id: 2,
-        zh: "将机器学习算法集成到语言学习应用中，为全球学习者创造了前所未有的机会。",
-        en: "The integration of machine learning algorithms into language learning applications has created unprecedented opportunities for learners worldwide.",
-      },
-      {
-        id: 3,
-        zh: "AI驱动的语言学习最显著的优势之一是它能够适应个人的学习风格和节奏。",
-        en: "One of the most significant advantages of AI-powered language learning is its ability to adapt to individual learning styles and paces.",
-      },
-      {
-        id: 4,
-        zh: "传统的课堂环境往往难以满足多样化的学习需求，但AI系统可以分析表现数据并相应调整难度级别。",
-        en: "Traditional classroom settings often struggle to accommodate diverse learning needs, but AI systems can analyze performance data and adjust difficulty levels accordingly.",
-      },
-      {
-        id: 5,
-        zh: "机器学习算法可以识别学生错误中的模式，并提供有针对性的练习来解决特定的弱点。",
-        en: "Machine learning algorithms can identify patterns in student errors and provide targeted exercises to address specific weaknesses.",
-      },
-      {
-        id: 6,
-        zh: "这种个性化方法确保学习者专注于他们最需要改进的领域，使学习时间更加高效和有效。",
-        en: "This personalized approach ensures that learners focus on areas where they need to most improvement, making study time more efficient and effective.",
-      },
-      {
-        id: 7,
-        zh: "此外，AI驱动的平台提供24/7全天候访问，允许学习者根据自己的方便进行练习。",
-        en: "Furthermore, AI-powered platforms offer 24/7 accessibility, allowing learners to practice at their convenience.",
-      },
-      {
-        id: 8,
-        zh: "这种灵活性对于日程不规律的忙碌专业人士或学生特别有价值，他们无法承诺固定的上课时间。",
-        en: "This flexibility is particularly valuable for busy professionals or students with irregular schedules who cannot commit to fixed class times.",
-      },
-      {
-        id: 9,
-        zh: "随着技术的不断发展，我们可以期待出现更加复杂的语言学习工具。",
-        en: "As technology continues to evolve, we can expect even more sophisticated language learning tools to emerge.",
-      },
-      {
-        id: 10,
-        zh: "从先进的语音识别到虚拟现实沉浸，语言教育的未来看起来越来越有希望，并且对所有背景的学习者都更加可及。",
-        en: "From advanced speech recognition to virtual reality immersion, the future of language education looks increasingly promising and accessible to learners of all backgrounds.",
-      },
-    ],
-  },
-]
-
-const UI_TEXT = {
-  zh: {
-    addToVocabulary: "已加入生词本",
-    fontSettings: "字体设置",
-    play: "播放",
-    fontSize: {
-      base: "标准",
-      lg: "大",
-      xl: "超大"
-    },
-    fontFamily: {
-      serif: "宋体",
-      kaiti: "楷体"
-    },
-    close: "关闭"
-  },
-  en: {
-    addToVocabulary: "Added to Vocabulary",
-    fontSettings: "Font Settings",
-    play: "Play",
-    fontSize: {
-      base: "Standard",
-      lg: "Large",
-      xl: "Extra Large"
-    },
-    fontFamily: {
-      serif: "Serif",
-      kaiti: "Kaiti"
-    },
-    close: "Close"
-  }
+interface ArticleData {
+  title_en: string
+  title_zh: string
+  category: string
+  content_en: string
+  content_zh: string
 }
 
-export default function NewsReaderPage({ params }: { params: { id: string } }) {
-  const toast = useToast()
-  const [fontSize, setFontSize] = useState<"base" | "lg" | "xl">("base")
-  const [fontFamily, setFontFamily] = useState<"serif" | "kaiti">("serif")
-  const [displayMode, setDisplayMode] = useState<"cn" | "en" | "both">("both")
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [showFontSettings, setShowFontSettings] = useState(false)
-  const [nativeLang, setNativeLang] = useState<NativeLang>("zh")
-  const [targetLang, setTargetLang] = useState<TargetLang>("en")
+interface Para { en: string; zh: string }
+interface Vocab { word: string; mean: string }
 
-  const t = UI_TEXT[nativeLang]
+const speak = (text: string, lang = 'zh-CN') => {
+  if (!text) return
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = lang
+  const voices = window.speechSynthesis.getVoices()
+  const bestVoice = voices.find(v => v.lang.includes(lang.replace('-', '_')) || v.lang.includes(lang))
+  if (bestVoice) u.voice = bestVoice
+  u.rate = lang === 'en-US' ? 1.0 : 0.9
+  window.speechSynthesis.speak(u)
+}
+
+const RenderEnglish = ({ text, vocabMap, fontSize }: { text: string, vocabMap: Map<string, string>, fontSize: string }) => {
+  if (!text) return null
+  const parts = text.split(/([a-zA-Z0-9-']+)/)
+  return (
+    <div className="flex gap-4 items-start">
+      <p className={`flex-1 font-serif leading-relaxed text-stone-800 ${fontSize === 'xl' ? 'text-2xl' : 'text-xl'}`}>
+        {parts.map((part, i) => {
+          const word = part.toLowerCase().replace(/[^a-z]/g, '')
+          const mean = vocabMap.get(word)
+          if (!word) return <span key={i}>{part}</span>
+          if (mean) {
+            return (
+              <span key={i} className="group relative inline-block mx-0.5">
+                <span 
+                  className="cursor-help border-b-2 border-[#C23E32]/30 text-[#C23E32]/90 font-medium group-hover:bg-[#C23E32]/10 group-hover:border-[#C23E32] transition-colors rounded-sm px-0.5"
+                  onClick={(e) => { e.stopPropagation(); speak(part, 'en-US') }}
+                >
+                  {part}
+                </span>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-stone-900 text-white text-sm rounded-xl shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 flex flex-col items-center gap-1 min-w-[80px]">
+                  <span className="flex items-center gap-1 font-bold text-yellow-400 text-xs uppercase tracking-wider">
+                    <Sparkles className="w-3 h-3" /> Key Word
+                  </span>
+                  <span className="font-serif text-base">{mean}</span>
+                  <span className="text-[10px] text-stone-400 bg-white/10 px-2 py-0.5 rounded-full mt-1 flex items-center gap-1">
+                    <Volume2 className="w-3 h-3" /> Click to listen
+                  </span>
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-stone-900"></span>
+                </span>
+              </span>
+            )
+          }
+          return (
+            <span 
+              key={i} 
+              className="hover:bg-stone-100 hover:text-stone-600 rounded-sm transition-colors cursor-pointer active:scale-95 active:text-blue-600 select-none"
+              onClick={(e) => { e.stopPropagation(); speak(part, 'en-US') }}
+              title="Click to pronounce"
+            >
+              {part}
+            </span>
+          )
+        })}
+      </p>
+      <button
+        onClick={(e) => { e.stopPropagation(); speak(text, 'en-US') }}
+        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white border border-stone-200 text-stone-400 hover:border-[#C23E32] hover:text-[#C23E32] active:scale-95 transition-all"
+        title="朗读整句"
+      >
+        <Volume2 className="w-5 h-5" />
+      </button>
+    </div>
+  )
+}
+
+const RenderChinese = ({ text, fontSize }: { text: string, fontSize: string }) => {
+  if (!text) return null
+  const parts = text.split(/([\u4e00-\u9fa5]+)/)
+  return (
+    <div className="flex gap-4 items-start">
+      <p className={`flex-1 font-serif leading-loose text-stone-600 ${fontSize}`}>
+        {parts.map((part, i) => {
+          if (/[\u4e00-\u9fa5]/.test(part)) {
+            return (
+              <span
+                key={i}
+                className="hover:bg-stone-200 hover:text-stone-800 rounded-sm transition-colors cursor-pointer select-none inline-block mx-0.5"
+                onClick={(e) => { e.stopPropagation(); speak(part, 'zh-CN') }}
+                title="点击朗读"
+              >
+                {part}
+              </span>
+            )
+          }
+          return <span key={i}>{part}</span>
+        })}
+      </p>
+      <button
+        onClick={(e) => { e.stopPropagation(); speak(text, 'zh-CN') }}
+        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white border border-stone-200 text-stone-400 hover:border-[#C23E32] hover:text-[#C23E32] active:scale-95 transition-all"
+        title="朗读整句"
+      >
+        <Volume2 className="w-5 h-5" />
+      </button>
+    </div>
+  )
+}
+
+const Loading = () => (
+  <div className="fixed inset-0 z-50 bg-[#FDFBF7] flex items-center justify-center">
+    <div className="text-center">
+      <Loader2 className="w-12 h-12 animate-spin text-[#C23E32] mx-auto mb-4" />
+      <p className="text-stone-600 font-serif">Loading...</p>
+    </div>
+  </div>
+)
+
+export default function UnifiedReaderPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter()
+  const resolvedParams = use(params)
+
+  const [article, setArticle] = useState<ArticleData | null>(null)
+  const [paras, setParas] = useState<Para[]>([])
+  const [vocabList, setVocabList] = useState<Vocab[]>([])
+  const [loading, setLoading] = useState(true)
+  const [size, setSize] = useState<"lg" | "xl">("lg")
 
   useEffect(() => {
-    const settings = getLanguageSettings()
-    setNativeLang(settings.nativeLang)
-    setTargetLang(settings.targetLang)
+    if (typeof window !== 'undefined') window.speechSynthesis.getVoices()
   }, [])
+
+  const vocabMap = useMemo(() => {
+    const map = new Map<string, string>()
+    vocabList.forEach(v => {
+      if (v.word && v.mean) map.set(v.word.toLowerCase(), v.mean)
+    })
+    return map
+  }, [vocabList])
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      const settings = getLanguageSettings()
-      setNativeLang(settings.nativeLang)
-      setTargetLang(settings.targetLang)
-    }
-
-    window.addEventListener("storage", handleStorageChange)
-    
-    return () => {
-      window.removeEventListener("storage", handleStorageChange)
-    }
-  }, [])
-
-  const article = newsContent[0]
-
-  const handleAddToVocabulary = () => {
-    toast.success(t.addToVocabulary)
-  }
-
-  const handleFontSettings = () => {
-    setShowFontSettings(!showFontSettings)
-  }
-
-  const handlePlay = () => {
-    setIsPlaying(!isPlaying)
-    if (!isPlaying) {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(targetLang === "zh" ? article.content[0].zh : article.content[0].en)
-        utterance.lang = targetLang === "zh" ? 'zh-CN' : 'en-US'
-        speechSynthesis.speak(utterance)
+    const load = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch(`/api/articles/${resolvedParams.id}`)
+        if (!res.ok) throw new Error("Fetch failed")
+        const raw: any = await res.json()
+        
+        if (!raw) {
+          setLoading(false)
+          setArticle({
+            title_en: "Content Not Found",
+            title_zh: "内容不存在",
+            content_en: "",
+            content_zh: "",
+            category: "ERROR"
+          })
+          return
+        }
+        const cEn = raw.contentEn || raw.content_en || ""
+        const cZh = raw.contentZh || raw.content_zh || ""
+        const tEn = raw.titleEn || raw.title_en || "Untitled"
+        const tZh = raw.titleZh || raw.title_zh || ""
+        const cat = raw.category || "STORY"
+        
+        console.log('原始数据:', { 
+          contentEn: cEn.substring(0, 200), 
+          contentZh: cZh.substring(0, 200),
+          titleEn: tEn,
+          titleZh: tZh,
+          category: cat
+        })
+        
+        let pList: Para[] = []
+        let vList: Vocab[] = []
+        
+        try {
+          if (cEn.trim().startsWith('{')) {
+            const json = JSON.parse(cEn)
+            if (json.paragraphs?.length) {
+              pList = json.paragraphs
+              if (json.vocab_data) vList = json.vocab_data
+            }
+          }
+        } catch (e) {
+          console.error("JSON 解析失败:", e)
+          // JSON 解析失败，使用备用方案
+        }
+        
+        if (pList.length === 0) {
+          const split = (t: string) => t.split(/\r?\n/).filter((x: string) => x.trim()) || []
+          let enTxt = cEn.trim().startsWith('{') ? "" : cEn
+          let en = split(enTxt)
+          let zh = split(cZh.replace(/【.*?】/g, '').trim())
+          
+          if (enTxt.length > 100) {
+            en = enTxt.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map((s: string) => s.trim()) || []
+          }
+          if (cZh.length > 100) {
+            zh = cZh.match(/[^。！？]+[。！？]+["']?|[^。！？]+$/g)?.map((s: string) => s.trim()) || []
+          }
+          
+          for (let i = 0; i < Math.min(en.length, zh.length); i++) {
+            const enPara = en[i] || ""
+            const zhPara = zh[i] || ""
+            
+            pList.push({ en: enPara, zh: zhPara })
+            
+            const enWords = enPara.match(/[a-zA-Z]+/g) || []
+            enWords.forEach((word: string) => {
+              if (!vList.find(v => v.word.toLowerCase() === word.toLowerCase())) {
+                vList.push({ word: word, mean: "" })
+              }
+            })
+          }
+        }
+        
+        setParas(pList)
+        setVocabList(vList)
+        setArticle({
+          title_en: tEn,
+          title_zh: tZh,
+          content_en: cEn,
+          content_zh: cZh,
+          category: cat
+        })
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
       }
     }
-  }
+    load()
+  }, [resolvedParams.id])
 
-  const getFontSizeClass = () => {
-    switch (fontSize) {
-      case "base":
-        return "text-lg md:text-xl"
-      case "lg":
-        return "text-xl md:text-2xl"
-      case "xl":
-        return "text-2xl md:text-3xl"
-      default:
-        return "text-lg md:text-xl"
-    }
-  }
+  if (loading) return <Loading />
+  if (!article) return <div className="p-8 text-center text-stone-600">Content Not Found</div>
 
-  const getFontFamilyClass = () => {
-    switch (fontFamily) {
-      case "serif":
-        return "font-serif"
-      case "kaiti":
-        return "font-kaiti"
-      default:
-        return "font-serif"
-    }
-  }
+  const zhTextSize = size === 'xl' ? 'text-xl' : 'text-lg'
 
   return (
-    <>
-      <div 
-        className="fixed inset-0 z-0 bg-ink-paper ink-landscape-bg"
-        aria-hidden="true"
-      />
-      
-      <motion.main 
-        className="relative z-10 min-h-screen overflow-y-auto"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ 
-          duration: 0.4, 
-          ease: [0.4, 0, 0.2, 1] 
-        }}
-      >
-        <ReaderHeader 
-          displayMode={displayMode}
-          onDisplayModeChange={setDisplayMode}
-        />
-        
-        <motion.div 
-          className="pt-20 pb-32"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ 
-            duration: 0.5, 
-            delay: 0.1,
-            ease: [0.4, 0, 0.2, 1] 
-          }}
-        >
-          <article className="w-full md:max-w-2xl md:mx-auto md:px-4">
-            <div className="w-full min-h-screen bg-[#FDFBF7]/90 rounded-none shadow-none md:min-h-0 md:rounded-sm md:shadow-[0_4px_20px_rgba(43,43,43,0.08)] md:my-8">
-              <div className="p-8 md:p-12">
-                {/* 标题区 */}
-                <header className="text-center mb-10">
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <span className="px-3 py-1 text-xs rounded-full font-medium bg-ink-vermilion/10 text-ink-vermilion">
-                      {targetLang === "zh" ? article.categoryZh : article.categoryEn}
-                    </span>
-                    <span className="text-sm text-ink-gray">
-                      {article.source}
-                    </span>
-                    <span className="text-sm text-ink-gray/60">
-                      {article.time}
-                    </span>
-                  </div>
+    <div className="min-h-screen" style={{ backgroundImage: 'url("/去文字.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <header className="fixed top-0 inset-x-0 z-50 h-16 bg-[#FDFBF7]/25 backdrop-blur-md border-b border-stone-200/50 flex items-center justify-between px-4">
+        <button onClick={() => router.back()} className="p-2 rounded-full hover:bg-stone-100 transition-colors"><ArrowLeft className="w-6 h-6 text-stone-600" /></button>
+        <div className="text-center">
+          <div className="font-serif font-bold text-stone-800 max-w-[200px] truncate">{article.title_en}</div>
+          <div className="text-[10px] text-stone-400 uppercase tracking-widest">{article.category}</div>
+        </div>
+        <button onClick={() => setSize(s => s === 'lg' ? 'xl' : 'lg')} className="p-2 rounded-full hover:bg-stone-100 transition-colors"><Type className="w-5 h-5 text-stone-600" /></button>
+      </header>
 
-                  {/* 主标题 - 根据学习模式显示目标语言 */}
-                  <h1 className={`${getFontSizeClass()} ${getFontFamilyClass()} text-ink-black font-semibold tracking-wide mb-2`}>
-                    {targetLang === "zh" ? article.titleZh : article.titleEn}
-                  </h1>
-
-                  {/* 副标题 - 显示母语作为辅助 */}
-                  <h2 className="text-sm text-gray-500 font-sans mt-2 mb-6">
-                    {targetLang === "zh" ? article.titleEn : article.titleZh}
-                  </h2>
-
-                  <div className="mx-auto w-32 h-px bg-gradient-to-r from-transparent via-ink-gray/40 to-transparent" />
-                </header>
-
-                {/* 图片区 */}
-                {article.image && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.3 }}
-                    className="mb-8"
-                  >
-                    <img
-                      src={article.image}
-                      alt={targetLang === "zh" ? article.titleZh : article.titleEn}
-                      className="w-full h-auto rounded-xl shadow-lg object-cover"
-                    />
-                  </motion.div>
-                )}
-
-                {/* 正文区 */}
-                <div className="space-y-6">
-                  {article.content.map((paragraph) => (
-                    <div key={paragraph.id} className="mb-6 last:mb-0">
-                      {/* 目标语言段落 - 主要阅读内容，大字 */}
-                      {(displayMode === "cn" || displayMode === "both") && (
-                        <p className={`${getFontSizeClass()} ${getFontFamilyClass()} text-ink-black leading-relaxed tracking-wide`}>
-                          {targetLang === "zh" ? paragraph.zh : paragraph.en}
-                        </p>
-                      )}
-
-                      {/* 母语言段落 - 辅助参考内容，小字灰阶 */}
-                      {(displayMode === "en" || displayMode === "both") && (
-                        <p className="text-sm text-gray-500 mt-2 leading-normal font-sans">
-                          {targetLang === "zh" ? paragraph.en : paragraph.zh}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </article>
-        </motion.div>
-
-        {/* 底部工具栏 */}
-        <div className="fixed bottom-0 left-0 right-0 w-full h-16 bg-[#FDFBF7]/90 backdrop-blur-md border-t border-stone-100 rounded-none z-50">
-          <div className="max-w-2xl mx-auto h-full px-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleAddToVocabulary}
-              className="flex flex-col items-center justify-center gap-1 w-20 h-full text-ink-gray hover:text-ink-black transition-all duration-200 active:scale-95"
-              aria-label={nativeLang === "zh" ? "加入生词本" : "Add to Vocabulary"}
-            >
-              <BookmarkPlus className="w-5 h-5" strokeWidth={1.5} />
-              <span className="text-xs">{nativeLang === "zh" ? "生词本" : "Vocabulary"}</span>
-            </button>
-            
-            <button
-              type="button"
-              onClick={handlePlay}
-              className="flex items-center justify-center w-14 h-14 rounded-full bg-[#C23E32] hover:bg-[#A33428] active:scale-95 transition-all duration-200 shadow-md"
-              aria-label={nativeLang === "zh" ? "播放全文" : "Play Full Text"}
-            >
-              <Play className="w-6 h-6 text-white ml-1" fill="white" strokeWidth={0} />
-            </button>
-            
-            <button
-              type="button"
-              onClick={handleFontSettings}
-              className="flex flex-col items-center justify-center gap-1 w-20 h-full text-ink-gray hover:text-ink-black transition-all duration-200 active:scale-95"
-              aria-label={t.fontSettings}
-            >
-              <Type className="w-5 h-5" strokeWidth={1.5} />
-              <span className="text-xs">{nativeLang === "zh" ? "字体" : "Font"}</span>
-            </button>
-          </div>
+      <main className="relative z-10 max-w-2xl mx-auto px-6 pt-24">
+        <div className="text-center mb-10">
+          <h1 className={`font-serif font-bold text-stone-900 mb-3 leading-tight ${size === 'xl' ? 'text-4xl' : 'text-3xl'}`}>
+            {article.title_en}
+          </h1>
+          <h2 className="text-stone-500 font-serif text-lg">
+            {article.title_zh}
+          </h2>
         </div>
 
-        {/* 字体设置面板 */}
-        {showFontSettings && (
-          <div 
-            className="fixed bottom-20 left-0 right-0 z-40 px-4"
-            role="dialog"
-            aria-label={t.fontSettings}
-          >
-            <div className="max-w-2xl mx-auto bg-[#FDFBF7]/95 backdrop-blur-md border border-stone-200/30 rounded-lg shadow-lg p-4">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-serif text-ink-black mb-2">{nativeLang === "zh" ? "字体大小" : "Font Size"}</h3>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFontSize("base")}
-                      className={`flex-1 py-2 px-4 rounded-lg font-serif text-sm transition-all ${
-                        fontSize === "base"
-                          ? "bg-[#C23E32] text-white"
-                          : "bg-stone-100 text-ink-gray hover:bg-stone-200"
-                      }`}
-                    >
-                      {t.fontSize.base}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFontSize("lg")}
-                      className={`flex-1 py-2 px-4 rounded-lg font-serif text-sm transition-all ${
-                        fontSize === "lg"
-                          ? "bg-[#C23E32] text-white"
-                          : "bg-stone-100 text-ink-gray hover:bg-stone-200"
-                      }`}
-                    >
-                      {t.fontSize.lg}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFontSize("xl")}
-                      className={`flex-1 py-2 px-4 rounded-lg font-serif text-sm transition-all ${
-                        fontSize === "xl"
-                          ? "bg-[#C23E32] text-white"
-                          : "bg-stone-100 text-ink-gray hover:bg-stone-200"
-                      }`}
-                    >
-                      {t.fontSize.xl}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-serif text-ink-black mb-2">{nativeLang === "zh" ? "字体类型" : "Font Type"}</h3>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFontFamily("serif")}
-                      className={`flex-1 py-2 px-4 rounded-lg font-serif text-sm transition-all ${
-                        fontFamily === "serif"
-                          ? "bg-[#C23E32] text-white"
-                          : "bg-stone-100 text-ink-gray hover:bg-stone-200"
-                      }`}
-                    >
-                      {t.fontFamily.serif}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFontFamily("kaiti")}
-                      className={`flex-1 py-2 px-4 rounded-lg font-kaiti text-sm transition-all ${
-                        fontFamily === "kaiti"
-                          ? "bg-[#C23E32] text-white"
-                          : "bg-stone-100 text-ink-gray hover:bg-stone-200"
-                      }`}
-                    >
-                      {t.fontFamily.kaiti}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleFontSettings}
-                  className="w-full py-2 bg-stone-100 text-ink-gray hover:bg-stone-200 rounded-lg font-serif text-sm transition-all"
-                >
-                  {t.close}
-                </button>
+        <div className="space-y-6">
+          {paras.map((p, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-[#FDFBF7]/60 backdrop-blur-sm rounded-2xl shadow-sm border border-stone-200/50 overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <div className="p-6 pb-4">
+                <RenderEnglish text={p.en} vocabMap={vocabMap} fontSize={size} />
               </div>
-            </div>
+              {p.en && p.zh && <div className="h-px bg-stone-200 mx-6" />}
+              {p.zh && (
+                <div className="p-6 pt-4 bg-[#FDFBF7]/40">
+                  <RenderChinese text={p.zh} fontSize={zhTextSize} />
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+
+        {paras.length === 0 && (
+          <div className="p-8 text-center bg-[#FDFBF7]/60 rounded-2xl shadow-sm border border-stone-200/50">
+            <p className="text-stone-400 mb-2">Generating Content...</p>
+            <p className="text-xs text-stone-300">Please wait for N8N to finish story.</p>
           </div>
         )}
-      </motion.main>
-    </>
+      </main>
+    </div>
   )
 }

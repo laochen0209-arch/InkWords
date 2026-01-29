@@ -11,6 +11,7 @@ export const TRANSLATIONS = {
     nav: {
       home: "首页",
       practice: "修习",
+      study: "学习",
       library: "文库",
       settings: "设置",
       profile: "我的",
@@ -24,8 +25,8 @@ export const TRANSLATIONS = {
       logout: "退出登录",
       logoutConfirm: "确定要退出登录吗？",
       logoutSuccess: "退出登录成功",
-      email_label: "手机号",
-      password_label: "验证码",
+      email_label: "邮箱",
+      password_label: "密码",
       login_btn: "登录",
       no_account: "还没有账号？",
       login_title: "欢迎回来",
@@ -36,7 +37,17 @@ export const TRANSLATIONS = {
       register_title: "注册",
       have_account: "已有账号？",
       login_now: "立即登录",
-      register_now: "立即注册"
+      register_now: "立即注册",
+      // 邮箱验证码相关
+      verification_code: "验证码",
+      send_code: "获取验证码",
+      email_invalid: "请输入有效的邮箱地址",
+      code_sent: "验证码已发送",
+      fill_all_fields: "请填写所有必填字段",
+      password_too_short: "密码长度至少为6位",
+      password_not_match: "两次输入的密码不一致",
+      register_success: "注册成功",
+      registering: "注册中..."
     },
     
     // 欢迎页
@@ -73,20 +84,30 @@ export const TRANSLATIONS = {
       },
       quickActions: {
         continuePractice: "继续修习",
-        reviewVocabulary: "生词复习"
+        reviewVocabulary: "生词复习",
+        startPractice: "开始修习"
       }
     },
 
     // 学习页
     practice: {
-      title: "修习",
+      title: "词句练习",
       words: "词语",
       sentences: "句子",
       observe: "观摩",
       write: "默写",
+      dictation: "观摩默写",
       tabs: {
         word: "词语",
         sentence: "句子"
+      },
+      categories: {
+        daily: "日常生活",
+        finance: "金融",
+        travel: "旅游",
+        business: "商务",
+        technology: "科技",
+        culture: "文化"
       },
       placeholder: {
         enterEnglish: "请输入英文单词...",
@@ -98,7 +119,8 @@ export const TRANSLATIONS = {
         correct: "正确！",
         incorrect: "再试一次"
       },
-      progress: "进度"
+      progress: "进度",
+      learned: "已学"
     },
     
     // 文库页
@@ -162,23 +184,32 @@ export const TRANSLATIONS = {
     
     // 阅读器
     reader: {
-      addToVocabulary: "已加入生词本",
-      fontSettings: "字体设置",
-      play: "播放",
+      addToVocabulary: "Added to Vocabulary",
+      fontSettings: "Font Settings",
+      play: "Play",
+      loading: "Loading...",
+      loadingFailed: "Loading Failed",
+      originalText: "Original Text",
+      translation: "Translation",
+      vocabulary: "Vocabulary",
+      noVocabulary: "No vocabulary yet",
+      liked: "Liked",
+      like: "Like",
+      share: "Share",
       fontSize: {
-        base: "标准",
-        lg: "大",
-        xl: "超大"
+        base: "Standard",
+        lg: "Large",
+        xl: "Extra Large"
       },
       fontFamily: {
-        serif: "宋体",
-        kaiti: "楷体"
+        serif: "Serif",
+        kaiti: "Kaiti"
       },
-      close: "关闭",
+      close: "Close",
       displayMode: {
-        both: "双语",
-        chinese: "仅中文",
-        english: "仅英文"
+        both: "Bilingual",
+        chinese: "Chinese Only",
+        english: "English Only"
       }
     },
     
@@ -188,15 +219,19 @@ export const TRANSLATIONS = {
       save: "保存",
       close: "关闭",
       confirm: "确认",
-      back: "返回"
+      back: "返回",
+      loading: "加载中...",
+      processing: "处理中...",
+      user: "修行者"
     }
   },
-  
+
   LEARN_CHINESE: {
     // 导航栏
     nav: {
       home: "Home",
       practice: "Practice",
+      study: "Study",
       library: "Library",
       settings: "Settings",
       profile: "Profile",
@@ -210,8 +245,8 @@ export const TRANSLATIONS = {
       logout: "Logout",
       logoutConfirm: "Are you sure you want to logout?",
       logoutSuccess: "Logout successful",
-      email_label: "Phone Number",
-      password_label: "Verification Code",
+      email_label: "Email",
+      password_label: "Password",
       login_btn: "Login",
       no_account: "Don't have an account?",
       login_title: "Welcome Back",
@@ -222,7 +257,17 @@ export const TRANSLATIONS = {
       register_title: "Sign Up",
       have_account: "Already have an account?",
       login_now: "Log In Now",
-      register_now: "Sign Up Now"
+      register_now: "Sign Up Now",
+      // 邮箱验证码相关
+      verification_code: "Verification Code",
+      send_code: "Get Code",
+      email_invalid: "Please enter a valid email address",
+      code_sent: "Verification code sent",
+      fill_all_fields: "Please fill in all required fields",
+      password_too_short: "Password must be at least 6 characters",
+      password_not_match: "Passwords do not match",
+      register_success: "Registration successful",
+      registering: "Registering..."
     },
     
     // 欢迎页
@@ -259,20 +304,30 @@ export const TRANSLATIONS = {
       },
       quickActions: {
         continuePractice: "Continue Practice",
-        reviewVocabulary: "Review Vocabulary"
+        reviewVocabulary: "Review Vocabulary",
+        startPractice: "Start Practice"
       }
     },
 
     // 学习页
     practice: {
-      title: "Practice",
+      title: "Word & Sentence Practice",
       words: "Words",
       sentences: "Sentences",
       observe: "Observe",
       write: "Write",
+      dictation: "Observe & Write",
       tabs: {
         word: "Word Practice",
         sentence: "Sentence Practice"
+      },
+      categories: {
+        daily: "Daily Life",
+        finance: "Finance",
+        travel: "Travel",
+        business: "Business",
+        technology: "Technology",
+        culture: "Culture"
       },
       placeholder: {
         enterEnglish: "Please enter English word...",
@@ -284,7 +339,8 @@ export const TRANSLATIONS = {
         correct: "Correct!",
         incorrect: "Try again"
       },
-      progress: "Progress"
+      progress: "Progress",
+      learned: "Learned"
     },
     
     // 文库页
@@ -351,6 +407,15 @@ export const TRANSLATIONS = {
       addToVocabulary: "Added to Vocabulary",
       fontSettings: "Font Settings",
       play: "Play",
+      loading: "Loading...",
+      loadingFailed: "Loading Failed",
+      originalText: "Original Text",
+      translation: "Translation",
+      vocabulary: "Vocabulary",
+      noVocabulary: "No vocabulary yet",
+      liked: "Liked",
+      like: "Like",
+      share: "Share",
       fontSize: {
         base: "Standard",
         lg: "Large",
@@ -374,7 +439,10 @@ export const TRANSLATIONS = {
       save: "Save",
       close: "Close",
       confirm: "Confirm",
-      back: "Back"
+      back: "Back",
+      loading: "Loading...",
+      processing: "Processing...",
+      user: "Cultivator"
     }
   }
 } as const

@@ -14,7 +14,7 @@ interface SentenceCardProps {
   pinyin: string
   en_hint?: string
   py_hint?: string
-  mode: "A" | "B"
+  mode: "A" | "B" | "C"
   nativeLang: NativeLang
   targetLang: TargetLang
   learningMode: "LEARN_CHINESE" | "LEARN_ENGLISH"
@@ -228,7 +228,7 @@ export function SentenceCard({
     <div className="relative w-full max-w-[360px] bg-white/90 shadow-lg rounded-xl">
       <div className="flex flex-col items-center justify-between p-6">
         {/* 主展示区 - 大号题目（使用动态计算的 questionText） */}
-        <div className="flex-1 flex items-center justify-center w-full mb-4 px-4">
+        <div className="flex-1 flex items-center justify-center w-full mb-3 px-4">
           <h1
             className={cn(
               "font-serif text-xl md:text-2xl lg:text-3xl font-semibold text-[#C23E32] break-words whitespace-normal w-full text-center leading-tight",
@@ -238,14 +238,29 @@ export function SentenceCard({
             {questionText}
           </h1>
         </div>
+
+        {/* 播放发音按钮 */}
+        <button
+          type="button"
+          onClick={handlePlayAudio}
+          className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-ink-vermilion transition-colors"
+        >
+          <Volume2 
+            className={cn(
+              "w-4 h-4 transition-all duration-300",
+              isPlaying && "animate-pulse text-ink-vermilion"
+            )}
+          />
+          {nativeLang === "zh" ? "播放" : "Play"}
+        </button>
       </div>
-      
+
       {/* 内容区域 - 添加背景和间距 */}
-      <div className="px-6 pb-6 space-y-6">
+      <div className="px-6 pb-6 space-y-4">
         {/* 辅助解析区 - 小字提示（强制始终显示） */}
         <div className="w-full">
           <p
-            className="text-center text-sm text-gray-500 font-sans leading-relaxed line-clamp-2"
+            className="text-center text-sm text-gray-500 font-sans leading-relaxed"
           >
             {hintText}
           </p>
@@ -255,7 +270,7 @@ export function SentenceCard({
         <div className="w-full">
           <p
             className={cn(
-              "text-center text-base md:text-lg text-gray-600 font-sans leading-relaxed transition-opacity duration-300 line-clamp-2",
+              "text-center text-lg md:text-xl text-gray-600 font-sans leading-relaxed transition-opacity duration-300 line-clamp-2",
               mode === "A" || showAnswer ? "opacity-100" : "opacity-0"
             )}
           >
@@ -275,9 +290,21 @@ export function SentenceCard({
           </p>
         </div>
 
+        {/* 重点词语展示区（观摩模式） */}
+        {mode === "A" && (
+          <div className="px-4 py-3 bg-gradient-to-br from-[#C23E32]/5 to-[#A8352B]/5 rounded-lg mx-4 mb-4">
+            <h3 className="text-center text-sm font-serif text-ink-vermilion mb-2">
+              {nativeLang === "zh" ? "重点词语" : "Key Words"}
+            </h3>
+            <p className="text-center text-base font-serif text-ink-black leading-relaxed">
+              {nativeLang === "zh" ? zh : en}
+            </p>
+          </div>
+        )}
+
         {/* 输入区（默写模式） */}
         {mode === "B" && (
-          <div className="w-full relative">
+          <div className="w-full relative px-6">
             <input
               ref={inputRef}
               type="text"
@@ -286,7 +313,7 @@ export function SentenceCard({
               onKeyDown={handleKeyDown}
               placeholder={getPlaceholder()}
               className={cn(
-                "w-full px-4 py-3 text-center font-sans text-base",
+                "w-full px-4 py-3 text-center font-sans text-lg",
                 "bg-transparent border-b-2 border-gray-300 rounded-none",
                 "placeholder:text-gray-400",
                 "focus:outline-none focus:border-[#C23E32] focus:ring-2 focus:ring-[#C23E32]/20",

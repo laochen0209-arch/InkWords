@@ -1,65 +1,78 @@
+/**
+ * @fileoverview 修习数据API
+ * @description 通用分类数据查询
+ * @author InkWords Team
+ * @version 5.1.0
+ */
+
+import { createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
-  let userStr: string | undefined
-  
+  const supabase = createServerClient()
+  const { searchParams } = new URL(request.url)
+  const category = searchParams.get('category')
+
+  console.log("📥 API收到请求，分类:", category)
+
+  if (!category) {
+    return NextResponse.json({ error: 'Category is required' }, { status: 400 })
+  }
+
   try {
-    userStr = request.headers.get('x-user-id') as string | undefined
-    
-    if (!userStr) {
-      return NextResponse.json(
-        { words: [], sentences: [] },
-        { status: 200 }
-      )
-    }
+    // 1. 并行查询单词和句子 (使用 exact match 精确匹配，因为数据库已清洗)
+    const [wordsResult, sentencesResult] = await Promise.all([
+      supabase
+        .from('StudyWord')
+        .select('*')
+        .eq('category', category)
+        .limit(200), // ✅ 修改：从 50 提升到 200
 
-    const userId = userStr
-
-    const [words, sentences] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId }
-      }).then((user: any) => {
-        if (!user) return []
-        return []
-      }),
-      prisma.practiceLog.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 5
-      }).then((logs: any) => {
-        return logs.map((log: any) => ({
-          id: log.id,
-          zh: log.mode === 'word' ? '示例单词' : '示例句子',
-          en: log.mode === 'word' ? 'Sample Word' : 'Sample Sentence',
-          pinyin: log.mode === 'word' ? 'shìlì' : 'shìlì',
-          meaning: log.mode === 'word' ? '示例含义' : '示例含义',
-          en_hint: log.mode === 'word' ? 'S______' : 'S______',
-          py_hint: log.mode === 'word' ? 's_ l_' : 's_ l_',
-          example: log.mode === 'word' ? '示例例句' : '示例例句',
-          examplePinyin: log.mode === 'word' ? 'shìlì jù' : 'shìlì jù',
-          exampleMeaning: log.mode === 'word' ? '示例含义' : '示例含义'
-        }))
-      })
+      supabase
+        .from('StudySentence')
+        .select('*')
+        .eq('category', category)
+        .limit(100) // ✅ 修改：从 20 提升到 100
     ])
 
+    // 2. 检查数据库错误
+    if (wordsResult.error) {
+      console.error("❌ Words Query Error:", wordsResult.error)
+      throw new Error(`Words query failed: ${wordsResult.error.message}`)
+    }
+
+    if (sentencesResult.error) {
+      console.error("❌ Sentences Query Error:", sentencesResult.error)
+      throw new Error(`Sentences query failed: ${sentencesResult.error.message}`)
+    }
+
+    console.log(`✅ 查询成功: ${wordsResult.data?.length || 0} Words, ${sentencesResult.data?.length || 0} Sentences`)
+
+    // 3. 映射句子数据字段 - 将数据库字段映射为前端期望的格式
+    const mappedSentences = (sentencesResult.data || []).map((sentence: any) => ({
+      id: sentence.id,
+      zh: sentence.contentZh || sentence.content_zh || '',
+      en: sentence.contentEn || sentence.content_en || '',
+      pinyin: sentence.pinyin || '',
+      category: sentence.category,
+      createdAt: sentence.createdAt,
+      updatedAt: sentence.updatedAt
+    }))
+
+    // 4. 返回数据
+    return NextResponse.json({
+      words: wordsResult.data || [],
+      sentences: mappedSentences,
+      wordsCount: wordsResult.data?.length || 0,
+      sentencesCount: mappedSentences.length,
+      success: true
+    })
+
+  } catch (error: any) {
+    console.error("❌ API Critical Error:", error)
     return NextResponse.json(
-      { 
-        words,
-        sentences,
-        userId
-      },
-      { status: 200 }
-    )
-  } catch (error) {
-    console.error('Get study data error:', error)
-    return NextResponse.json(
-      { 
-        words: [],
-        sentences: [],
-        userId: userStr || ''
-      },
-      { status: 200 }
+      { error: error.message || 'Internal Server Error' },
+      { status: 500 }
     )
   }
 }

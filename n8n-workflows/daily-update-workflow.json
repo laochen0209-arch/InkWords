@@ -1,0 +1,141 @@
+{
+  "name": "InkWords Daily Content Update",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-domain.com/api/daily/update",
+        "authentication": "none",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"secret\": \"your-secret-key-123\",\n  \"category\": \"daily\",\n  \"words\": [\n    {\n      \"english\": \"Breakfast\",\n      \"chinese\": \"早餐\",\n      \"pinyin\": \"zǎo cān\",\n      \"exampleEn\": \"I usually have eggs and toast for breakfast.\",\n      \"exampleZh\": \"我通常早餐吃鸡蛋和吐司。\",\n      \"difficulty\": 1\n    }\n  ],\n  \"sentences\": [\n    {\n      \"contentEn\": \"A healthy lifestyle requires balance in diet, exercise, and rest.\",\n      \"contentZh\": \"健康的生活方式需要在饮食、运动和休息之间保持平衡。\",\n      \"pinyin\": \"jiàn kāng de shēng huó fāng shì xū yào zài yǐn shí, yùn dòng hé xiū xi zhī jiān bǎo chí píng héng.\",\n      \"author\": \"Health Expert\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "send-to-api",
+      "name": "Send to API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-success",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "content": "✅ Daily content update successful\n\nWords: {{ $json.wordsCreated }}\nSentences: {{ $json.sentencesCreated }}\nCategory: {{ $json.category }}",
+        "height": 400,
+        "width": 600
+      },
+      "id": "success-notify",
+      "name": "Success Notification",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "content": "❌ Daily content update failed\n\nError: {{ $json.error }}",
+        "height": 400,
+        "width": 600
+      },
+      "id": "error-notify",
+      "name": "Error Notification",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send to API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to API": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

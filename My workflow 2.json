@@ -1,0 +1,683 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "754f519b-e7cd-4fc8-8e2b-95c9621e99e6",
+      "name": "定时触发 (24h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as count FROM \"Article\" WHERE \"created_at\" > current_date;",
+        "options": {}
+      },
+      "id": "1b351635-eb2b-45b0-98ec-5fc55ddcd7b6",
+      "name": "查账: 今日限额检查",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [
+        -368,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.count }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "id": "740ceb8a-6a13-4154-9223-a831bec811f2",
+      "name": "判断: 还有额度吗?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+        "options": {}
+      },
+      "id": "fc246fc2-1c9d-437d-abb4-70df33f18085",
+      "name": "源: 新闻 (BBC)",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        4720
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+        "options": {}
+      },
+      "id": "ad510ecb-44e4-4001-a21c-2e183a7cb370",
+      "name": "源: 经典 (百科)",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.theguardian.com/books/rss",
+        "options": {}
+      },
+      "id": "60cd2f6f-5b98-4fb5-a165-06e731f222ee",
+      "name": "源: 小说 (美文)",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.link }}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "id": "bfacf0cf-9928-4f4f-8101-52c398151277",
+      "name": "防重: 库里有了吗?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [
+        608,
+        5024
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "YvAzrOTTlLbmZRYe",
+          "name": "Postgres account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.id }}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "id": "1a65350c-5d5d-4862-87fd-fb06c504f75f",
+      "name": "是否为新文章?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        784,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $node[\"合流: 统一入口1\"].json[\"title\"] }} {{ $node[\"合流: 统一入口1\"].json[\"contentSnippet\"] }}\n\n你是 JSON 转换器。【严禁输出任何 Markdown、严禁输出任何说明文字】。 请直接返回纯 JSON： { \"titleEn\": \"...\", \"titleZh\": \"...\", \"contentEn\": \"...\", \"contentZh\": \"...\", \"category\": \"{{ $json.category }}\", \"vocab_data\": [], \"key_sentence\": [] }\n\n注意：引用里那个 \"1\" 必须和您画布上的名字 合流: 统一入口1 一模一样。"
+      },
+      "id": "99e805c5-68ef-44e0-b3b3-66e51e5bb2af",
+      "name": "AI 深度分发与提取",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        944,
+        4720
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "={{ $json.titleEn }}"
+            },
+            {
+              "name": "={{ $json.titleZh }}h"
+            },
+            {
+              "name": "={{ $json.contentEn }}"
+            },
+            {
+              "name": "={{ $json.contentZh }}"
+            },
+            {
+              "name": "={{ $json.category }}"
+            },
+            {
+              "name": "={{ $json.link }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d96936e2-f518-4c1c-91ed-d11a4717f7fd",
+      "name": "数据瘦身",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1440,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO \"Article\" (title_en, title_zh, content_en, content_zh, category, source_url, vocab_data, key_sentence)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "options": {
+          "queryReplacement": "={{ $json.titleEn }}, {{ $json.titleZh }}, {{ $json.contentEn }}, {{ $json.contentZh }}, {{ $json.category }}, {{ $json.link }}, {{ JSON.stringify($json.vocab_data) }}, {{ JSON.stringify($json.key_sentence) }}"
+        }
+      },
+      "id": "4ea1507f-6586-4ea3-ac6d-5f8bd06bc3ac",
+      "name": "正式入库",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [
+        1632,
+        4784
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YvAzrOTTlLbmZRYe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "value": "CrawlerLog"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "SKIPPED",
+            "message": "文章重复",
+            "created_at": "={{ $now }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "36b48ba7-d00a-4cce-a8ac-c78269680a4c",
+      "name": "记录日志: 重复跳过",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [
+        992,
+        5120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YvAzrOTTlLbmZRYe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "0c5c1ac0-a3f7-46a1-baa2-197f8ec27902",
+      "name": "合流: 统一入口1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        384,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.link }}",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "id": "if-bbc-world",
+      "name": "判断BBC World",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        384,
+        4720
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.link }}",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "id": "if-bbc-science",
+      "name": "判断BBC Science",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        384,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.link }}",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "id": "if-guardian-books",
+      "name": "判断Guardian Books",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        384,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "news"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-bbc-world-category",
+      "name": "设置BBC World分类",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        4720
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "classic"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-bbc-science-category",
+      "name": "设置BBC Science分类",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "novel"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-guardian-category",
+      "name": "设置Guardian分类",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "news"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-default-category",
+      "name": "设置默认分类",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        5160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  // 1. 强行剥离 AI 可能吐出的 Markdown 废话\n  const raw = $json.text.replace(/```json/gi, '').replace(/```/gi, '').trim();\n  const p = JSON.parse(raw);\n\n  // 2. 这里的名字必须和画布上左侧那个节点名完全一致，注意那个\"1\"\n  const link = $node[\"合流: 统一入口1\"].json[\"link\"];\n\n  return { ...p, link: link };\n} catch (e) {\n  return { error: \"解析失败\", msg: e.message, raw: $json.text };\n}"
+      },
+      "id": "5db04b4e-54ac-497b-9d72-44eaba8ad2de",
+      "name": "暴力清洗解析1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        992,
+        4912
+      ],
+      "id": "9ae755bb-abe3-4de9-b037-813449f7d153",
+      "name": "DeepSeek Chat Model1",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": true,
+      "waitBetweenTries": 500,
+      "credentials": {
+        "deepSeekApi": {
+          "id": "126TD1iv6jJk2IcD",
+          "name": "DeepSeek account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "定时触发 (24h)": {
+      "main": [
+        [
+          {
+            "node": "查账: 今日限额检查",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "查账: 今日限额检查": {
+      "main": [
+        [
+          {
+            "node": "判断: 还有额度吗?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "判断: 还有额度吗?": {
+      "main": [
+        [
+          {
+            "node": "源: 新闻 (BBC)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "源: 经典 (百科)",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "源: 小说 (美文)",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "源: 新闻 (BBC)": {
+      "main": [
+        [
+          {
+            "node": "判断BBC World",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "源: 经典 (百科)": {
+      "main": [
+        [
+          {
+            "node": "判断BBC Science",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "源: 小说 (美文)": {
+      "main": [
+        [
+          {
+            "node": "判断Guardian Books",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "判断BBC World": {
+      "main": [
+        [
+          {
+            "node": "设置BBC World分类",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "判断BBC Science": {
+      "main": [
+        [
+          {
+            "node": "设置BBC Science分类",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "判断Guardian Books": {
+      "main": [
+        [
+          {
+            "node": "设置Guardian分类",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "设置BBC World分类": {
+      "main": [
+        [
+          {
+            "node": "合流: 统一入口1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "设置BBC Science分类": {
+      "main": [
+        [
+          {
+            "node": "合流: 统一入口1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "设置Guardian分类": {
+      "main": [
+        [
+          {
+            "node": "合流: 统一入口1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "设置默认分类": {
+      "main": [
+        [
+          {
+            "node": "合流: 统一入口1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "合流: 统一入口1": {
+      "main": [
+        [
+          {
+            "node": "是否为新文章?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "是否为新文章?": {
+      "main": [
+        [
+          {
+            "node": "AI 深度分发与提取",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "记录日志: 重复跳过",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI 深度分发与提取": {
+      "main": [
+        [
+          {
+            "node": "暴力清洗解析1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "暴力清洗解析1": {
+      "main": [
+        [
+          {
+            "node": "数据瘦身",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "数据瘦身": {
+      "main": [
+        [
+          {
+            "node": "正式入库",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "正式入库": {
+      "main": []
+    },
+    "记录日志: 重复跳过": {
+      "main": []
+    },
+    "防重: 库里有了吗?": {
+      "main": []
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "4df96b17-5347-4d9b-866d-548e8fc102b9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9ce5e5c4350333f8c3731a271a503df297f2046986e182bf3cfb60649bff265d"
+  },
+  "id": "LGJ06AxYB-iqTppxNbGmm",
+  "tags": []
+}

@@ -94,7 +94,7 @@ export default function LoginPage() {
         localStorage.setItem("inkwords_user", JSON.stringify(data.user))
         
         setTimeout(() => {
-          window.location.href = "/study"
+          window.location.href = "/check-in"
         }, 500)
       } else {
         console.error("登录失败:", data)

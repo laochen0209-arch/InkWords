@@ -40,13 +40,15 @@ export default function LanguagesPage() {
   const handleSetNative = (lang: "zh" | "en") => {
     const newMode = lang === "zh" ? "LEARN_ENGLISH" : "LEARN_CHINESE"
     switchMode(newMode)
-    success(t.settings.saved)
+    const newT = TRANSLATIONS[newMode]
+    success(newT.settings.saved)
   }
 
   const handleSetTarget = (lang: "zh" | "en") => {
     const newMode = lang === "en" ? "LEARN_ENGLISH" : "LEARN_CHINESE"
     switchMode(newMode)
-    success(t.settings.saved)
+    const newT = TRANSLATIONS[newMode]
+    success(newT.settings.saved)
   }
 
   const handleBack = () => {

@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { NativeLang, TargetLang } from "@/lib/language-utils"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
+import { InteractiveParagraph } from "./interactive-paragraph"
 
 interface ReaderContentProps {
   fontSize?: "base" | "lg" | "xl"
@@ -108,18 +109,14 @@ export function ReaderContent({
                       : "relative"
                   }
                 >
-                  {/* 主展示内容 - 大字 */}
+                  {/* 主展示内容 - 大字 - 使用 InteractiveParagraph 组件实现点击即读 */}
                   {getMainContent(index) && (
-                    <p className={`${getFontSizeClass()} ${getFontFamilyClass()} text-ink-black leading-loose tracking-wide`}>
-                      {getMainContent(index)}
-                      {/* 朗读图标 */}
-                      {isPlaying !== null && (
-                        <Volume2 
-                          className="inline-block ml-2 w-4 h-4 text-ink-vermilion animate-pulse" 
-                          aria-label="正在朗读"
-                        />
-                      )}
-                    </p>
+                    <InteractiveParagraph 
+                      text={getMainContent(index) || ""}
+                      lang={targetLang === "zh" ? "zh-CN" : "en-US"}
+                      fontSize={fontSize}
+                      fontFamily={fontFamily}
+                    />
                   )}
                   
                   {/* 辅助解析 - 小字灰阶 */}

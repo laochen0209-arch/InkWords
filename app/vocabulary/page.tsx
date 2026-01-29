@@ -52,9 +52,11 @@ const itemVariants: Variants = {
 
 export default function VocabularyPage() {
   const [words, setWords] = useState<WordItem[]>(mockWords)
+type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in"
+
   const totalCount = words.length
   const masteredCount = words.filter(w => w.mastered).length
-  const [activeTab, setActiveTab] = useState<"home" | "practice" | "library" | "profile">("library")
+  const [activeTab, setActiveTab] = useState<TabType>("library")
   
   const handleRemove = (id: string) => {
     setWords(prev => prev.filter(w => w.id !== id))

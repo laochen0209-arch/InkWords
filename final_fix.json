@@ -1,0 +1,340 @@
+{
+  "name": "InkWords_Final_Production_v4",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hours": 24
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        0
+      ],
+      "id": "timer-news",
+      "name": "⏱️ 24小时 (News)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hours": 48
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        200
+      ],
+      "id": "timer-classics",
+      "name": "⏱️ 48小时 (Classics)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hours": 72
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        400
+      ],
+      "id": "timer-novels",
+      "name": "⏱️ 72小时 (Novels)"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "rss_url",
+              "value": "http://feeds.bbci.co.uk/news/world/rss.xml"
+            },
+            {
+              "name": "target_category",
+              "value": "news"
+            }
+          ],
+          "number": [
+            {
+              "name": "batch_limit",
+              "value": 1
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "config-news",
+      "name": "配置: News (测试)"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "rss_url",
+              "value": "https://www.gutenberg.org/cache/epub/feeds/today.rss"
+            },
+            {
+              "name": "target_category",
+              "value": "classics"
+            }
+          ],
+          "number": [
+            {
+              "name": "batch_limit",
+              "value": 1
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "id": "config-classics",
+      "name": "配置: Classics (测试)"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "rss_url",
+              "value": "https://standardebooks.org/feeds/rss/new-releases"
+            },
+            {
+              "name": "target_category",
+              "value": "novel"
+            }
+          ],
+          "number": [
+            {
+              "name": "batch_limit",
+              "value": 1
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "id": "config-novels",
+      "name": "配置: Novels (测试)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        200
+      ],
+      "id": "config-hub",
+      "name": "配置汇流"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.rss_url }}"
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        440,
+        200
+      ],
+      "id": "fetch-rss",
+      "name": "抓取 RSS"
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('配置汇流').first().json;\nconst limit = config.batch_limit || 1;\nconst category = config.target_category;\nconst newItems = items.slice(0, limit);\nnewItems.forEach(item => {\n  item.json.category = category;\n});\nreturn newItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ],
+      "id": "limit-and-tag",
+      "name": "✂️ 裁剪与打标"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        200
+      ],
+      "id": "逐条处理",
+      "name": "逐条处理"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_DEEPSEEK_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "deepseek-chat"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [\n  {\n    \"role\": \"system\",\n    \"content\": \"你是一个极其严谨的双语编辑。请处理用户输入的文章片段，并输出严格的 JSON 格式。\\n\\n任务：\\n1. Title: 生成英文主标题 (title_en) 和中文副标题 (title_zh)。\\n2. Summary: 生成一句话中文摘要。\\n3. Content: 保留英文正文 (content_en) 并生成中文翻译 (content_zh)。\\n4. Vocab: 提取 5-8 个核心生词 (vocab_data)，包含 word, meaning, pronunciation, context_sentence。\\n\\n⚠️ 注意：category 字段已由上游锁定，无需生成。只输出纯 JSON，不要包含 ```json 代码块标记。\"\n  },\n  {\n    \"role\": \"user\",\n    \"content\": \"Title: \" + $json.title + \"\\nContent: \" + $json.contentSnippet\n  }\n] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {\"type\": \"json_object\"} }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1100,
+        200
+      ],
+      "id": "DeepSeek 清洗",
+      "name": "DeepSeek 清洗"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🧹 暴力清洗解析 (解决\"找不到回路\"报错)\n// 1. 获取 DeepSeek 的原始回答\nconst raw = items[0].json.choices[0].message.content;\n\n// 2. 暴力去除非法字符\nconst clean = raw.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n\n// 3. 解析成对象\nlet data = {};\ntry {\n  data = JSON.parse(clean);\n} catch (e) {\n  data = { title_en: \"解析失败\", summary: \"JSON Error\" };\n}\n\n// 4. 获取上游分类 (这里是关键！我们在这里把分类抓过来，打包给下游)\nconst category = $('逐条处理').item.json.category;\n\n// 5. 输出纯净数据\nreturn [{\n  json: {\n    category: category,\n    title_en: data.title_en,\n    title_zh: data.title_zh,\n    summary: data.summary,\n    content_en: data.content_en,\n    content_zh: data.content_zh,\n    vocab_data: typeof data.vocab_data === 'object' ? JSON.stringify(data.vocab_data) : data.vocab_data\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        200
+      ],
+      "id": "code-parser",
+      "name": "📦 暴力清洗+打包"
+    },
+    {
+      "parameters": {
+        "tableId": "Article",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title_en": "={{ $json.title_en }}",
+            "title_zh": "={{ $json.title_zh }}",
+            "content_en": "={{ $json.content_en }}",
+            "content_zh": "={{ $json.content_zh }}",
+            "vocab_data": "={{ $json.vocab_data }}",
+            "summary": "={{ $json.summary }}",
+            "category": "={{ $json.category }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        200
+      ],
+      "id": "supabase-insert",
+      "name": "正式入库",
+      "credentials": {
+        "supabaseApi": {
+          "id": "Supabase account", 
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "⏱️ 24小时 (News)": {
+      "main": [ [ { "node": "配置: News (测试)", "type": "main", "index": 0 } ] ]
+    },
+    "⏱️ 48小时 (Classics)": {
+      "main": [ [ { "node": "配置: Classics (测试)", "type": "main", "index": 0 } ] ]
+    },
+    "⏱️ 72小时 (Novels)": {
+      "main": [ [ { "node": "配置: Novels (测试)", "type": "main", "index": 0 } ] ]
+    },
+    "配置: News (测试)": {
+      "main": [ [ { "node": "配置汇流", "type": "main", "index": 0 } ] ]
+    },
+    "配置: Classics (测试)": {
+      "main": [ [ { "node": "配置汇流", "type": "main", "index": 0 } ] ]
+    },
+    "配置: Novels (测试)": {
+      "main": [ [ { "node": "配置汇流", "type": "main", "index": 0 } ] ]
+    },
+    "配置汇流": {
+      "main": [ [ { "node": "抓取 RSS", "type": "main", "index": 0 } ] ]
+    },
+    "抓取 RSS": {
+      "main": [ [ { "node": "✂️ 裁剪与打标", "type": "main", "index": 0 } ] ]
+    },
+    "✂️ 裁剪与打标": {
+      "main": [ [ { "node": "逐条处理", "type": "main", "index": 0 } ] ]
+    },
+    "逐条处理": {
+      "main": [ [ { "node": "DeepSeek 清洗", "type": "main", "index": 0 } ] ]
+    },
+    "DeepSeek 清洗": {
+      "main": [ [ { "node": "📦 暴力清洗+打包", "type": "main", "index": 0 } ] ]
+    },
+    "📦 暴力清洗+打包": {
+      "main": [ [ { "node": "正式入库", "type": "main", "index": 0 } ] ]
+    },
+    "正式入库": {
+      "main": [ [ { "node": "逐条处理", "type": "main", "index": 0 } ] ]
+    }
+  }
+}

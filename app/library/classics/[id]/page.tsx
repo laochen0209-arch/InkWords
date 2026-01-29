@@ -1,364 +1,303 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useState, useEffect, use, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { Loader2, Type, ArrowLeft, Volume2, Sparkles } from "lucide-react"
 import { motion } from "framer-motion"
-import { ArrowLeft, BookOpen, Heart, Share2, Volume2 } from "lucide-react"
-import Link from "next/link"
-import { useLanguage } from "@/lib/contexts/language-context"
-import { TRANSLATIONS } from "@/lib/i18n"
-import { useTTS } from "@/lib/hooks/use-tts"
+import { InteractiveParagraph } from "@/components/reader/interactive-paragraph"
 
-const CLASSICS_DATA = [
-  { 
-    id: 1, 
-    title_zh: "静夜思", 
-    title_en: "Quiet Night Thought", 
-    author: "李白", 
-    author_zh: "李白",
-    author_en: "Li Bai",
-    dynasty_zh: "唐代",
-    dynasty_en: "Tang Dynasty",
-    content_zh: "床前明月光，\n疑是地上霜。\n举头望明月，\n低头思故乡。",
-    content_en: "Before my bed a pool of light,\nIs it hoarfrost on the ground?\nI lift my head and look at the bright moon,\nI lower my head and think of my hometown.",
-    translation_zh: "明亮的月光洒在床前的窗户纸上，好像地上泛起了一层霜。我禁不住抬起头，看那天窗外空中的明月，不由得低头沉思，想起远方的家乡。",
-    translation_en: "The bright moonlight shines on the window paper before the bed, as if a layer of frost has risen on the ground. I can't help but lift my head to look at the bright moon in the sky outside the window, and involuntarily lower my head in deep thought, thinking of my hometown far away.",
-    type: "五言绝句",
-    tags_zh: ["思乡", "月亮", "经典"],
-    tags_en: ["Homesickness", "Moon", "Classic"]
-  },
-  { 
-    id: 2, 
-    title_zh: "春晓", 
-    title_en: "Spring Dawn", 
-    author: "孟浩然", 
-    author_zh: "孟浩然",
-    author_en: "Meng Haoran",
-    dynasty_zh: "唐代",
-    dynasty_en: "Tang Dynasty",
-    content_zh: "春眠不觉晓，\n处处闻啼鸟。\n夜来风雨声，\n花落知多少。",
-    content_en: "I slumbered this spring morning,\nAnd missed the dawn.\nFrom everywhere I heard the cry of birds,\nThe sound of wind and rain came in the night,\nHow many flowers fell?",
-    translation_zh: "春夜酣睡，不知不觉已经到了早晨。到处都能听到鸟儿的啼鸣。回想昨夜的阵阵风雨声，不知道吹落了多少花儿。",
-    translation_en: "I slept soundly this spring night, unaware that morning had arrived. Everywhere I could hear the crying of birds. Recalling the sound of wind and rain from last night, I wonder how many flowers fell.",
-    type: "五言绝句",
-    tags_zh: ["春天", "自然", "写景"],
-    tags_en: ["Spring", "Nature", "Scenery"]
-  },
-  { 
-    id: 3, 
-    title_zh: "登鹳雀楼", 
-    title_en: "Climbing Stork Tower", 
-    author: "王之涣", 
-    author_zh: "王之涣",
-    author_en: "Wang Zhihuan",
-    dynasty_zh: "唐代",
-    dynasty_en: "Tang Dynasty",
-    content_zh: "白日依山尽，\n黄河入海流。\n欲穷千里目，\n更上一层楼。",
-    content_en: "The white sun sets behind the mountains,\nThe Yellow River flows into the sea.\nTo see a thousand miles further,\nGo up one more story.",
-    translation_zh: "太阳依傍着西边的山峦渐渐落下，滚滚的黄河向着东海奔流而去。如果要想把千里的风光景物看够，那就要登上更高的一层城楼。",
-    translation_en: "The sun sets behind the western mountains, and the rolling Yellow River flows toward the East Sea. If you want to see enough of the thousand-mile scenery, you must climb one more story of the tower.",
-    type: "五言绝句",
-    tags_zh: ["登高", "黄河", "壮志"],
-    tags_en: ["Climbing", "Yellow River", "Ambition"]
-  },
-  { 
-    id: 4, 
-    title_zh: "江雪", 
-    title_en: "River Snow", 
-    author: "柳宗元", 
-    author_zh: "柳宗元",
-    author_en: "Liu Zongyuan",
-    dynasty_zh: "唐代",
-    dynasty_en: "Tang Dynasty",
-    content_zh: "千山鸟飞绝，\n万径人踪灭。\n孤舟蓑笠翁，\n独钓寒江雪。",
-    content_en: "A thousand mountains, birds fly no more.\nTen thousand paths, human traces are gone.\nA lone boat, straw cloak and hat,\nAn old man fishes alone in the cold river snow.",
-    translation_zh: "所有的山上，都看不到飞鸟的影子，所有的小路，都没有人的足迹。江面上孤舟上有一个披着蓑衣、戴着斗笠的老翁，独自在寒冷的江雪中垂钓。",
-    translation_en: "On all the mountains, no shadows of flying birds can be seen. On all the small paths, no human footprints remain. On the lone boat on the river, an old man in a straw cloak and hat fishes alone in the cold river snow.",
-    type: "五言绝句",
-    tags_zh: ["冬天", "孤独", "江雪"],
-    tags_en: ["Winter", "Solitude", "River Snow"]
-  }
-]
+interface ArticleData {
+  title_en: string
+  title_zh: string
+  category: string
+  content_en: string
+  content_zh: string
+}
 
-export default function ClassicsDetailPage() {
-  const params = useParams()
+interface Para { en: string; zh: string }
+interface Vocab { word: string; mean: string }
+
+const speak = (text: string, lang = 'zh-CN') => {
+  if (!text) return
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = lang
+  const voices = window.speechSynthesis.getVoices()
+  const bestVoice = voices.find(v => v.lang.includes(lang.replace('-', '_')) || v.lang.includes(lang))
+  if (bestVoice) u.voice = bestVoice
+  u.rate = lang === 'en-US' ? 1.0 : 0.9
+  window.speechSynthesis.speak(u)
+}
+
+const RenderEnglish = ({ text, vocabMap, fontSize }: { text: string, vocabMap: Map<string, string>, fontSize: string }) => {
+  if (!text) return null
+  const parts = text.split(/([a-zA-Z0-9-']+)/)
+  return (
+    <div className="flex gap-4 items-start">
+      <p className={`flex-1 font-serif leading-relaxed text-stone-800 ${fontSize === 'xl' ? 'text-2xl' : 'text-xl'}`}>
+        {parts.map((part, i) => {
+          const word = part.toLowerCase().replace(/[^a-z]/g, '')
+          const mean = vocabMap.get(word)
+          if (!word) return <span key={i}>{part}</span>
+          if (mean) {
+            return (
+              <span key={i} className="group relative inline-block mx-0.5">
+                <span 
+                  className="cursor-help border-b-2 border-[#C23E32]/30 text-[#C23E32]/90 font-medium group-hover:bg-[#C23E32]/10 group-hover:border-[#C23E32] transition-colors rounded-sm px-0.5"
+                  onClick={(e) => { e.stopPropagation(); speak(part, 'en-US') }}
+                >
+                  {part}
+                </span>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-stone-900 text-white text-sm rounded-xl shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 flex flex-col items-center gap-1 min-w-[80px]">
+                  <span className="flex items-center gap-1 font-bold text-yellow-400 text-xs uppercase tracking-wider">
+                    <Sparkles className="w-3 h-3" /> Key Word
+                  </span>
+                  <span className="font-serif text-base">{mean}</span>
+                  <span className="text-[10px] text-stone-400 bg-white/10 px-2 py-0.5 rounded-full mt-1 flex items-center gap-1">
+                    <Volume2 className="w-3 h-3" /> Click to listen
+                  </span>
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-stone-900"></span>
+                </span>
+              </span>
+            )
+          }
+          return (
+            <span 
+              key={i} 
+              className="hover:bg-stone-100 hover:text-stone-600 rounded-sm transition-colors cursor-pointer active:scale-95 active:text-blue-600 select-none"
+              onClick={(e) => { e.stopPropagation(); speak(part, 'en-US') }}
+              title="Click to pronounce"
+            >
+              {part}
+            </span>
+          )
+        })}
+      </p>
+      <button
+        onClick={(e) => { e.stopPropagation(); speak(text, 'en-US') }}
+        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white border border-stone-200 text-stone-400 hover:border-[#C23E32] hover:text-[#C23E32] active:scale-95 transition-all"
+        title="朗读整句"
+      >
+        <Volume2 className="w-5 h-5" />
+      </button>
+    </div>
+  )
+}
+
+const RenderChinese = ({ text, fontSize }: { text: string, fontSize: string }) => {
+  if (!text) return null
+  const parts = text.split(/([\u4e00-\u9fa5]+)/)
+  return (
+    <div className="flex gap-4 items-start">
+      <p className={`flex-1 font-serif leading-loose text-stone-600 ${fontSize}`}>
+        {parts.map((part, i) => {
+          if (/[\u4e00-\u9fa5]/.test(part)) {
+            return (
+              <span
+                key={i}
+                className="hover:bg-stone-200 hover:text-stone-800 rounded-sm transition-colors cursor-pointer select-none inline-block mx-0.5"
+                onClick={(e) => { e.stopPropagation(); speak(part, 'zh-CN') }}
+                title="点击朗读"
+              >
+                {part}
+              </span>
+            )
+          }
+          return <span key={i}>{part}</span>
+        })}
+      </p>
+      <button
+        onClick={(e) => { e.stopPropagation(); speak(text, 'zh-CN') }}
+        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white border border-stone-200 text-stone-400 hover:border-[#C23E32] hover:text-[#C23E32] active:scale-95 transition-all"
+        title="朗读整句"
+      >
+        <Volume2 className="w-5 h-5" />
+      </button>
+    </div>
+  )
+}
+
+const Loading = () => (
+  <div className="fixed inset-0 z-50 bg-[#FDFBF7] flex items-center justify-center">
+    <div className="text-center">
+      <Loader2 className="w-12 h-12 animate-spin text-[#C23E32] mx-auto mb-4" />
+      <p className="text-stone-600 font-serif">Loading...</p>
+    </div>
+  </div>
+)
+
+export default function UnifiedReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const { learningMode } = useLanguage()
-  const t = TRANSLATIONS[learningMode === "LEARN_CHINESE" ? "LEARN_CHINESE" : "LEARN_ENGLISH"]
-  const [isLiked, setIsLiked] = useState(false)
-  const poemId = params.id as string
-  const poem = CLASSICS_DATA.find(p => p.id === parseInt(poemId))
-  const { isPlaying, speak } = useTTS({ learningMode })
+  const resolvedParams = use(params)
+
+  const [article, setArticle] = useState<ArticleData | null>(null)
+  const [paras, setParas] = useState<Para[]>([])
+  const [vocabList, setVocabList] = useState<Vocab[]>([])
+  const [loading, setLoading] = useState(true)
+  const [size, setSize] = useState<"lg" | "xl">("lg")
 
   useEffect(() => {
-    if (!poem) {
-      router.push("/library")
+    if (typeof window !== 'undefined') window.speechSynthesis.getVoices()
+  }, [])
+
+  const vocabMap = useMemo(() => {
+    const map = new Map<string, string>()
+    vocabList.forEach(v => {
+      if (v.word && v.mean) map.set(v.word.toLowerCase(), v.mean)
+    })
+    return map
+  }, [vocabList])
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch(`/api/articles/${resolvedParams.id}`)
+        if (!res.ok) throw new Error("Fetch failed")
+        const raw: any = await res.json()
+        
+        if (!raw) {
+          setLoading(false)
+          setArticle({
+            title_en: "Content Not Found",
+            title_zh: "内容不存在",
+            content_en: "",
+            content_zh: "",
+            category: "ERROR"
+          })
+          return
+        }
+        const cEn = raw.contentEn || raw.content_en || ""
+        const cZh = raw.contentZh || raw.content_zh || ""
+        const tEn = raw.titleEn || raw.title_en || "Untitled"
+        const tZh = raw.titleZh || raw.title_zh || ""
+        const cat = raw.category || "STORY"
+        
+        console.log('原始数据:', { 
+          contentEn: cEn.substring(0, 200), 
+          contentZh: cZh.substring(0, 200),
+          titleEn: tEn,
+          titleZh: tZh,
+          category: cat
+        })
+        
+        let pList: Para[] = []
+        let vList: Vocab[] = []
+        
+        try {
+          if (cEn.trim().startsWith('{')) {
+            const json = JSON.parse(cEn)
+            if (json.paragraphs?.length) {
+              pList = json.paragraphs
+              if (json.vocab_data) vList = json.vocab_data
+            }
+          }
+        } catch (e) {
+          console.error("JSON 解析失败:", e)
+          // JSON 解析失败，使用备用方案
+        }
+        
+        if (pList.length === 0) {
+          const split = (t: string) => t.split(/\r?\n/).filter((x: string) => x.trim()) || []
+          let enTxt = cEn.trim().startsWith('{') ? "" : cEn
+          let en = split(enTxt)
+          let zh = split(cZh.replace(/【.*?】/g, '').trim())
+          
+          if (enTxt.length > 100) {
+            en = enTxt.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map((s: string) => s.trim()) || []
+          }
+          if (cZh.length > 100) {
+            zh = cZh.match(/[^。！？]+[。！？]+["']?|[^。！？]+$/g)?.map((s: string) => s.trim()) || []
+          }
+          
+          for (let i = 0; i < Math.min(en.length, zh.length); i++) {
+            const enPara = en[i] || ""
+            const zhPara = zh[i] || ""
+            
+            pList.push({ en: enPara, zh: zhPara })
+            
+            const enWords = enPara.match(/[a-zA-Z]+/g) || []
+            enWords.forEach((word: string) => {
+              if (!vList.find(v => v.word.toLowerCase() === word.toLowerCase())) {
+                vList.push({ word: word, mean: "" })
+              }
+            })
+          }
+        }
+        
+        setParas(pList)
+        setVocabList(vList)
+        setArticle({
+          title_en: tEn,
+          title_zh: tZh,
+          content_en: cEn,
+          content_zh: cZh,
+          category: cat
+        })
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [poem, router])
+    load()
+  }, [resolvedParams.id])
 
-  if (!poem) {
-    return null
-  }
+  if (loading) return <Loading />
+  if (!article) return <div className="p-8 text-center text-stone-600">Content Not Found</div>
 
-  const getDisplayTitle = () => {
-    return learningMode === "LEARN_CHINESE" ? poem.title_zh : poem.title_en
-  }
-
-  const getDisplayAuthor = () => {
-    return learningMode === "LEARN_CHINESE" ? poem.author_zh : poem.author_en
-  }
-
-  const getDisplayDynasty = () => {
-    return learningMode === "LEARN_CHINESE" ? poem.dynasty_zh : poem.dynasty_en
-  }
-
-  const getDisplayContent = () => {
-    return learningMode === "LEARN_CHINESE" ? poem.content_zh : poem.content_en
-  }
-
-  const getDisplayTranslation = () => {
-    return learningMode === "LEARN_CHINESE" ? poem.translation_en : poem.translation_zh
-  }
-
-  const getDisplayTags = () => {
-    return learningMode === "LEARN_CHINESE" ? poem.tags_en : poem.tags_zh
-  }
-
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-  }
-
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: getDisplayTitle(),
-        text: `${getDisplayAuthor()} - ${getDisplayTitle()}`,
-        url: window.location.href
-      })
-    }
-  }
+  const zhTextSize = size === 'xl' ? 'text-xl' : 'text-lg'
 
   return (
-    <main className="min-h-screen bg-ink-paper">
-      <div 
-        className="fixed inset-0 z-0 pointer-events-none ink-landscape-bg"
-        aria-hidden="true"
-      />
+    <div className="min-h-screen" style={{ backgroundImage: 'url("/去文字.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <header className="fixed top-0 inset-x-0 z-50 h-16 bg-[#FDFBF7]/25 backdrop-blur-md border-b border-stone-200/50 flex items-center justify-between px-4">
+        <button onClick={() => router.back()} className="p-2 rounded-full hover:bg-stone-100 transition-colors"><ArrowLeft className="w-6 h-6 text-stone-600" /></button>
+        <div className="text-center">
+          <div className="font-serif font-bold text-stone-800 max-w-[200px] truncate">{article.title_en}</div>
+          <div className="text-[10px] text-stone-400 uppercase tracking-widest">{article.category}</div>
+        </div>
+        <button onClick={() => setSize(s => s === 'lg' ? 'xl' : 'lg')} className="p-2 rounded-full hover:bg-stone-100 transition-colors"><Type className="w-5 h-5 text-stone-600" /></button>
+      </header>
 
-      <div className="relative z-10 min-h-screen px-4 py-6">
-        <div className="max-w-2xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <Link
-              href="/library"
-              className="inline-flex items-center gap-2 text-ink-gray hover:text-ink-black transition-colors mb-6"
-            >
-              <ArrowLeft className="w-5 h-5" strokeWidth={1.5} />
-              <span className="font-serif text-sm">
-                {learningMode === "LEARN_CHINESE" ? "返回文库" : "Back to Library"}
-              </span>
-            </Link>
+      <main className="relative z-10 max-w-2xl mx-auto px-6 pt-24">
+        <div className="text-center mb-10">
+          <h1 className={`font-serif font-bold text-stone-900 mb-3 leading-tight ${size === 'xl' ? 'text-4xl' : 'text-3xl'}`}>
+            {article.title_en}
+          </h1>
+          <h2 className="text-stone-500 font-serif text-lg">
+            {article.title_zh}
+          </h2>
+        </div>
 
+        <div className="space-y-6">
+          {paras.map((p, i) => (
             <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="bg-white/70 backdrop-blur-md border border-white/40 rounded-2xl p-8 shadow-lg"
-              >
-              <div className="text-center mb-8">
-                <motion.h1
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
-                  className="font-serif text-3xl md:text-4xl text-ink-black font-bold mb-3"
-                >
-                  {getDisplayTitle()}
-                </motion.h1>
-                
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.6, delay: 0.25 }}
-                  className="flex items-center justify-center gap-3 mb-6"
-                >
-                  <button
-                    type="button"
-                    onClick={() => speak(getDisplayContent())}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#C23E32] text-white hover:bg-[#A8352B] transition-all duration-300 shadow-md"
-                  >
-                    <Volume2 
-                      className={`w-5 h-5 transition-all duration-300 ${
-                        isPlaying ? "animate-pulse" : ""
-                      }`}
-                    />
-                    <span className="font-serif text-sm font-medium">
-                      {learningMode === "LEARN_CHINESE" ? "朗读" : "Read"}
-                    </span>
-                  </button>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.6, delay: 0.3 }}
-                  className="flex items-center justify-center gap-3 mb-6"
-                >
-                  <span className="font-serif text-sm text-ink-gray/60">
-                    {learningMode === "LEARN_CHINESE" ? "朝代" : "Dynasty"}
-                  </span>
-                  <span className="font-serif text-base text-ink-black font-medium">
-                    {getDisplayDynasty()}
-                  </span>
-                  <span className="w-1 h-1 bg-ink-gray/30 rounded-full" />
-                  <span className="font-serif text-sm text-ink-gray/60">
-                    {learningMode === "LEARN_CHINESE" ? "作者" : "Author"}
-                  </span>
-                  <span className="font-serif text-base text-ink-black font-medium">
-                    {getDisplayAuthor()}
-                  </span>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                  className="flex items-center justify-center gap-2 mb-8"
-                >
-                  <div className="flex items-center gap-2">
-                    {getDisplayTags().map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-[#C23E32]/10 text-[#C23E32] rounded-full text-xs font-medium"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </motion.div>
-              </div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.5 }}
-                className="border-t border-ink-gray/20 pt-8 mb-8"
-              >
-                <h2 className="font-serif text-lg text-ink-black font-semibold mb-6 text-center">
-                  {learningMode === "LEARN_CHINESE" ? "原文" : "Original Text"}
-                </h2>
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.6 }}
-                  className="bg-[#FDFBF7]/50 rounded-xl p-6 mb-6"
-                >
-                  <p className="font-serif text-xl md:text-2xl text-ink-black leading-loose text-center whitespace-pre-line">
-                    {getDisplayContent()}
-                  </p>
-                </motion.div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.7 }}
-                className="border-t border-ink-gray/20 pt-8"
-              >
-                <h2 className="font-serif text-lg text-ink-black font-semibold mb-6 text-center">
-                  {learningMode === "LEARN_CHINESE" ? "译文" : "Translation"}
-                </h2>
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.8 }}
-                  className="bg-gradient-to-br from-[#C23E32]/5 to-[#A8352B]/5 rounded-xl p-6"
-                >
-                  <p className="font-serif text-base text-ink-gray/80 leading-relaxed">
-                    {getDisplayTranslation()}
-                  </p>
-                </motion.div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.9 }}
-                className="flex items-center justify-center gap-4 pt-6"
-              >
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleLike}
-                  className={`
-                    flex items-center gap-2 px-6 py-3 rounded-xl font-serif text-base transition-all duration-300
-                    ${isLiked
-                      ? "bg-[#C23E32] text-white"
-                      : "bg-stone-100 text-ink-gray hover:bg-stone-200"
-                    }
-                  `}
-                >
-                  <Heart className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`} strokeWidth={1.5} />
-                  {isLiked
-                    ? (learningMode === "LEARN_CHINESE" ? "已收藏" : "Liked")
-                    : (learningMode === "LEARN_CHINESE" ? "收藏" : "Like")
-                  }
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleShare}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl font-serif text-base bg-stone-100 text-ink-gray hover:bg-stone-200 transition-all duration-300"
-                >
-                  <Share2 className="w-5 h-5" strokeWidth={1.5} />
-                  {learningMode === "LEARN_CHINESE" ? "分享" : "Share"}
-                </motion.button>
-              </motion.div>
-            </motion.div>
-
-            <motion.div
+              key={i}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 1 }}
-              className="mt-8"
+              transition={{ delay: i * 0.05 }}
+              className="bg-[#FDFBF7]/60 backdrop-blur-sm rounded-2xl shadow-sm border border-stone-200/50 overflow-hidden hover:shadow-md transition-shadow"
             >
-              <h3 className="font-serif text-lg text-ink-black font-semibold mb-4">
-                {learningMode === "LEARN_CHINESE" ? "相关诗词" : "Related Poems"}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {CLASSICS_DATA.filter(p => p.id !== poem.id).slice(0, 2).map((item, index) => (
-                  <Link
-                    key={item.id}
-                    href={`/library/classics/${item.id}`}
-                    className="block"
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: 1.1 + index * 0.1 }}
-                      whileHover={{ scale: 1.02 }}
-                      className="bg-white/60 backdrop-blur-md border border-white/40 rounded-xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer border-l-4 border-l-[#C23E32] pl-4"
-                    >
-                      <h4 className="font-serif text-base font-bold text-gray-900 mb-2">
-                        {learningMode === "LEARN_CHINESE" ? item.title_zh : item.title_en}
-                      </h4>
-                      <div className="text-sm text-gray-600 mb-2">
-                        {learningMode === "LEARN_CHINESE" ? item.author_zh : item.author_en}
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
-                        {learningMode === "LEARN_CHINESE" ? item.content_zh.replace(/\n/g, '') : item.content_en.replace(/\n/g, '')}
-                      </p>
-                    </motion.div>
-                  </Link>
-                ))}
+              <div className="p-6 pb-4">
+                <RenderEnglish text={p.en} vocabMap={vocabMap} fontSize={size} />
               </div>
+              {p.en && p.zh && <div className="h-px bg-stone-200 mx-6" />}
+              {p.zh && (
+                <div className="p-6 pt-4 bg-[#FDFBF7]/40">
+                  <RenderChinese text={p.zh} fontSize={zhTextSize} />
+                </div>
+              )}
             </motion.div>
-          </motion.div>
+          ))}
         </div>
-      </div>
-    </main>
+
+        {paras.length === 0 && (
+          <div className="p-8 text-center bg-[#FDFBF7]/60 rounded-2xl shadow-sm border border-stone-200/50">
+            <p className="text-stone-400 mb-2">Generating Content...</p>
+            <p className="text-xs text-stone-300">Please wait for N8N to finish story.</p>
+          </div>
+        )}
+      </main>
+    </div>
   )
 }

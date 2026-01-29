@@ -18,7 +18,7 @@ interface StudyCardProps {
   example?: string
   examplePinyin?: string
   exampleMeaning?: string
-  mode: "A" | "B"
+  mode: "A" | "B" | "C"
   nativeLang: NativeLang
   targetLang: TargetLang
   learningMode: "LEARN_CHINESE" | "LEARN_ENGLISH"
@@ -250,7 +250,7 @@ export function StudyCard({
     >
       <div className="flex flex-col items-center justify-between p-6">
         {/* 主展示区 - 大号题目（使用动态计算的 questionText） */}
-        <div className="flex-1 flex items-center justify-center w-full mb-2 px-4">
+        <div className="flex-1 flex items-center justify-center w-full mb-3 px-4">
           <h1
             className={cn(
               "font-serif text-2xl md:text-3xl lg:text-4xl font-semibold text-[#C23E32] break-words whitespace-normal w-full text-center leading-tight",
@@ -261,68 +261,11 @@ export function StudyCard({
           </h1>
         </div>
 
-        {/* 辅助解析区 - 小字提示（强制始终显示） */}
-        <div className="w-full mb-6">
-          <p
-            className="text-center text-sm text-gray-500 font-sans leading-relaxed"
-          >
-            {hintText}
-          </p>
-        </div>
-
-        {/* 答案展示区（观摩模式或显示答案时） */}
-        <div className="w-full mb-6">
-          <p
-            className={cn(
-              "text-center text-xl text-gray-600 font-sans leading-relaxed transition-opacity duration-300",
-              mode === "A" || showAnswer ? "opacity-100" : "opacity-0"
-            )}
-          >
-            {learningMode === 'LEARN_ENGLISH' ? en : pinyin}
-          </p>
-        </div>
-
-        {/* 参考翻译展示区（观摩模式或显示答案时，小字号作为参考） */}
-        <div className="w-full mb-4">
-          <p
-            className={cn(
-              "text-center text-sm text-gray-400 font-sans leading-relaxed transition-opacity duration-300",
-              mode === "A" || showAnswer ? "opacity-100" : "opacity-0"
-            )}
-          >
-            {nativeLang === "zh" ? pinyin : en}
-          </p>
-        </div>
-
-        {/* 输入区（默写模式） */}
-        {mode === "B" && (
-          <div className="w-full relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={getPlaceholder()}
-              className={cn(
-                "w-full px-4 py-3 text-center font-sans text-lg",
-                "bg-transparent border-b-2 border-gray-300 rounded-none",
-                "placeholder:text-gray-400",
-                "focus:outline-none focus:border-[#C23E32] focus:ring-2 focus:ring-[#C23E32]/20",
-                "transition-all duration-200",
-                isCorrect && "border-green-600 text-green-600 focus:border-green-600 focus:ring-green-600/20",
-                isError && "border-[#C23E32] text-[#C23E32] focus:border-[#C23E32] focus:ring-[#C23E32]/20"
-              )}
-              autoFocus
-            />
-          </div>
-        )}
-
         {/* 播放发音按钮 */}
         <button
           type="button"
           onClick={handlePlayAudio}
-          className="mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-ink-vermilion transition-colors"
+          className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-ink-vermilion transition-colors"
         >
           <Volume2 
             className={cn(
@@ -330,12 +273,81 @@ export function StudyCard({
               isPlaying && "animate-pulse text-ink-vermilion"
             )}
           />
-          {nativeLang === "zh" ? "播放发音" : "Play Audio"}
+          {nativeLang === "zh" ? "播放" : "Play"}
         </button>
       </div>
+
+      {/* 辅助解析区 - 小字提示（强制始终显示） */}
+      <div className="w-full mb-4 px-6">
+        <p
+          className="text-center text-base text-gray-500 font-sans leading-relaxed"
+        >
+          {hintText}
+        </p>
+      </div>
+
+      {/* 答案展示区（观摩模式或显示答案时） */}
+      <div className="w-full mb-4 px-6">
+        <p
+          className={cn(
+            "text-center text-xl md:text-2xl text-gray-600 font-sans leading-relaxed transition-opacity duration-300",
+            mode === "A" || showAnswer ? "opacity-100" : "opacity-0"
+          )}
+        >
+          {learningMode === 'LEARN_ENGLISH' ? en : pinyin}
+        </p>
+      </div>
+
+      {/* 参考翻译展示区（观摩模式或显示答案时，小字号作为参考） */}
+      <div className="w-full mb-4 px-6">
+        <p
+          className={cn(
+            "text-center text-sm text-gray-400 font-sans leading-relaxed transition-opacity duration-300",
+            mode === "A" || showAnswer ? "opacity-100" : "opacity-0"
+          )}
+        >
+          {nativeLang === "zh" ? pinyin : en}
+        </p>
+      </div>
+
+      {/* 重点词语展示区（观摩模式） */}
+      {mode === "A" && (
+        <div className="px-6 py-4 bg-gradient-to-br from-[#C23E32]/5 to-[#A8352B]/5 rounded-lg mx-4 mb-4">
+          <h3 className="text-center text-sm font-serif text-ink-vermilion mb-2">
+            {nativeLang === "zh" ? "重点词语" : "Key Words"}
+          </h3>
+          <p className="text-center text-base font-serif text-ink-black leading-relaxed">
+            {nativeLang === "zh" ? zh : en}
+          </p>
+        </div>
+      )}
+
+      {/* 输入区（默写模式） */}
+      {mode === "B" && (
+        <div className="w-full relative px-6">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={getPlaceholder()}
+            className={cn(
+              "w-full px-4 py-3 text-center font-sans text-lg",
+              "bg-transparent border-b-2 border-gray-300 rounded-none",
+              "placeholder:text-gray-400",
+              "focus:outline-none focus:border-[#C23E32] focus:ring-2 focus:ring-[#C23E32]/20",
+              "transition-all duration-200",
+              isCorrect && "border-green-600 text-green-600 focus:border-green-600 focus:ring-green-600/20",
+              isError && "border-[#C23E32] text-[#C23E32] focus:border-[#C23E32] focus:ring-[#C23E32]/20"
+            )}
+            autoFocus
+          />
+        </div>
+      )}
       
       {example && (
-        <div className="mt-6 pt-6 border-t border-gray-200 px-6 pb-6">
+        <div className="mt-4 pt-4 border-t border-gray-200 px-6 pb-6">
           <div className="space-y-2">
             <p className="text-sm text-gray-600 italic font-serif leading-relaxed">
               {example}

@@ -10,9 +10,11 @@ import { useToast } from "@/components/ink-toast/toast-context"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 
+type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in"
+
 export default function ProfilePage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"home" | "practice" | "library" | "profile">("profile")
+  const [activeTab, setActiveTab] = useState<TabType>("profile")
   const toast = useToast()
   const { learningMode } = useLanguage()
 

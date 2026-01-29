@@ -54,10 +54,12 @@ model Vocabulary {
   exampleEn   String   @map("example_en")
   exampleZh   String   @map("example_zh")
   difficulty   Int
+  category    String   @default("daily")
   createdAt   DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([english])
+  @@index([category])
 }
 
 model Sentence {
@@ -66,10 +68,12 @@ model Sentence {
   contentZh   String   @map("content_zh")
   pinyin      String
   author      String
+  category    String   @default("daily")
   createdAt   DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([author])
+  @@index([category])
 }
 
 model Article {
@@ -79,6 +83,7 @@ model Article {
   contentEn   String   @map("content_en")
   contentZh   String   @map("content_zh")
   category    String
+  imageUrl    String?
   createdAt   DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -125,4 +130,89 @@ model CrawlerConfig {
   lastRunAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// 用户学习进度模型 - 记录用户在修习页面的学习情况
+model UserProgress {
+  id            String   @id @default(cuid())
+  userId        String   // 用户ID
+  category      String   // 分类：daily/finance/travel/technology
+  contentType   String   // 内容类型：word/sentence
+  contentId     String   // 学习内容ID（StudyWord或StudySentence的ID）
+  isLearned     Boolean  @default(false) // 是否已学习
+  learnedAt     DateTime? // 学习时间
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, category, contentType, contentId]) // 确保同一内容不会重复记录
+  @@index([userId, category, contentType])
+  @@index([userId, isLearned])
+}
+
+// 用户学习统计模型 - 记录每日学习统计
+model UserStudyStats {
+  id              String   @id @default(cuid())
+  userId          String   // 用户ID
+  date            DateTime @default(now()) // 日期
+  wordsLearned    Int      @default(0) // 今日学习词汇数
+  sentencesLearned Int     @default(0) // 今日学习句子数
+  totalLearned    Int      @default(0) // 今日总学习数
+  studyTime       Int      @default(0) // 学习时长（分钟）
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date]) // 每天只有一条记录
+  @@index([userId, date])
+}
+
+// 用户签到记录模型
+model CheckIn {
+  id          String   @id @default(cuid())
+  userId      String   // 用户ID
+  date        DateTime @default(now()) // 签到日期
+  points      Int      @default(10) // 签到获得的积分
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, date]) // 每天只能签到一次
+  @@index([userId, date])
+}
+
+// 邮箱验证码模型
+model VerificationCode {
+  id          String   @id @default(cuid())
+  email       String   // 邮箱地址
+  code        String   // 验证码
+  type        String   // 类型：register/reset_password
+  expiresAt   DateTime // 过期时间
+  createdAt   DateTime @default(now())
+
+  @@index([email, type]) // 用于查询用户的验证码
+  @@index([expiresAt])   // 用于清理过期验证码
+}
+
+// 学习词汇表 - StudyWord
+model StudyWord {
+  id          String   @id @default(cuid())
+  word        String   // 英文单词
+  meaning     String   // 中文释义
+  pronunciation String // 音标
+  example     String   // 例句
+  category    String   @default("daily") // 分类
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}
+
+// 学习句子表 - StudySentence
+model StudySentence {
+  id          String   @id @default(cuid())
+  contentZh   String   @map("content_zh") // 中文内容
+  contentEn   String   @map("content_en") // 英文内容
+  pinyin      String   // 拼音
+  category    String   @default("daily") // 分类
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
 }
