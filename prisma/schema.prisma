@@ -216,3 +216,20 @@ model StudySentence {
 
   @@index([category])
 }
+
+// 考试结果表 - 存储用户考试记录和AI评语
+model ExamResult {
+  id          String   @id @default(cuid())
+  userId      String   // 用户ID
+  examType    String   // 考试类型：IELTS/TOEFL/CET-4等
+  score       Int      // 实际得分
+  maxScore    Int      // 满分
+  details     Json     // 各部分得分和错题详情
+  aiFeedback  String?  // AI评语（主观题评语）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([examType])
+  @@index([createdAt])
+}
