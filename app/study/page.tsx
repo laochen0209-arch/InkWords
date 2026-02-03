@@ -74,25 +74,37 @@ export default function StudyPage() {
   // 🔒 防止连跳的锁
   const isNavigating = useRef(false)
 
-  // 分类列表
-  const categories = [
-    { id: 'Lifestyle', label: 'Lifestyle', icon: '☕' },      // ✅ Label 改为英文
-    { id: 'Professional', label: 'Professional', icon: '💼' } // ✅ Label 改为英文
-  ]
-
   // 判断是否为学中文模式
   const isLearnChinese = learningMode === "LEARN_CHINESE"
+
+  // 分类列表 - 根据学习模式动态显示中英文
+  // LEARN_CHINESE 模式显示英文 UI，LEARN_ENGLISH 模式显示中文 UI
+  const categories = [
+    { id: 'Lifestyle', label: isLearnChinese ? 'Lifestyle' : '生活', icon: '☕' },
+    { id: 'Professional', label: isLearnChinese ? 'Professional' : '职场', icon: '💼' }
+  ]
 
   // 获取用户ID
   const getUserId = useCallback(() => {
     if (typeof window !== 'undefined') {
+      // 优先从 inkwords_user 对象中获取
+      const userStr = localStorage.getItem('inkwords_user')
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr)
+          return user.id || user.userId || null
+        } catch (e) {
+          console.error('解析用户数据失败:', e)
+        }
+      }
+      // 兼容旧版本直接存储的 userId
       return localStorage.getItem('userId')
     }
     return null
   }, [])
 
   // 获取学习数据
-  const fetchStudyData = useCallback(async (categoryLabel: string) => {
+  const fetchStudyData = useCallback(async (categoryLabel: string, signal?: AbortSignal) => {
     try {
       setIsLoading(true)
       setError(null)
@@ -117,6 +129,7 @@ export default function StudyPage() {
       
       const response = await fetch(`/api/study/data?category=${encodeURIComponent(dbCategory)}`, {
         headers: userId ? { 'x-user-id': userId } : {},
+        signal,
       })
       
       if (!response.ok) {
@@ -134,6 +147,11 @@ export default function StudyPage() {
       setSentences(data.sentences || [])
       
     } catch (err) {
+      // 忽略请求取消错误
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('🚫 请求被取消')
+        return
+      }
       console.error('❌ 获取数据失败:', err)
       setError('获取学习数据失败，请稍后重试')
     } finally {
@@ -143,7 +161,12 @@ export default function StudyPage() {
 
   // 分类变化时重新获取数据
   useEffect(() => {
-    fetchStudyData(selectedCategory)
+    const controller = new AbortController()
+    fetchStudyData(selectedCategory, controller.signal)
+    
+    return () => {
+      controller.abort()
+    }
   }, [selectedCategory, fetchStudyData])
 
   // 获取当前学习内容
@@ -341,10 +364,8 @@ export default function StudyPage() {
         setFeedbackStatus('correct')
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
         
-        // 正确输入后自动跳转到下一个内容
-        setTimeout(() => {
-          handleNext()
-        }, 1000) // 延迟1秒，让用户看到正确反馈
+        // 不再自动跳转，等待用户按回车或空格键
+        // 用户可以在查看正确答案后，按回车或空格键继续
       } else {
         setFeedbackStatus('wrong')
       }
@@ -380,15 +401,21 @@ export default function StudyPage() {
     setShowHint(false)
   }
 
-  // 全局键盘监听 - Enter 键控制检查/下一题
+  // 全局键盘监听 - Enter/空格键控制检查/下一题
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && mode === 'B' && currentItem) {
+      // 支持 Enter 键和空格键
+      if ((e.key === 'Enter' || e.key === ' ') && mode === 'B' && currentItem) {
+        // 防止空格键滚动页面
+        if (e.key === ' ') {
+          e.preventDefault()
+        }
+        
         if (feedbackStatus === 'correct') {
-          // 如果已经正确，Enter 键进入下一题
+          // 如果已经正确，Enter/空格键进入下一题
           handleNext()
         } else if (feedbackStatus === 'idle' || feedbackStatus === 'wrong') {
-          // 如果未检查或错误，Enter 键执行检查
+          // 如果未检查或错误，Enter/空格键执行检查
           handleCheck()
         }
       }
@@ -668,8 +695,13 @@ export default function StudyPage() {
                           
                           {/* 反馈信息 */}
                           {feedbackStatus === 'correct' && (
-                            <div className="mt-3 text-center text-green-600 font-serif text-lg">
-                              ✅ Correct! Great job!
+                            <div className="mt-3 text-center">
+                              <div className="text-green-600 font-serif text-lg">
+                                ✅ Correct! Great job!
+                              </div>
+                              <div className="text-sm text-stone-400 mt-1">
+                                Press Enter or Space to continue
+                              </div>
                             </div>
                           )}
                           {feedbackStatus === 'wrong' && (
@@ -781,8 +813,13 @@ export default function StudyPage() {
                           </div>
                           
                           {feedbackStatus === 'correct' && (
-                            <div className="mt-3 text-center text-green-600 font-serif text-lg">
-                              ✅ Correct! Great job!
+                            <div className="mt-3 text-center">
+                              <div className="text-green-600 font-serif text-lg">
+                                ✅ Correct! Great job!
+                              </div>
+                              <div className="text-sm text-stone-400 mt-1">
+                                Press Enter or Space to continue
+                              </div>
                             </div>
                           )}
                           {feedbackStatus === 'wrong' && (
@@ -954,8 +991,13 @@ export default function StudyPage() {
                           
                           {/* 反馈信息 */}
                           {feedbackStatus === 'correct' && (
-                            <div className="mt-3 text-center text-green-600 font-serif text-lg">
-                              ✅ Correct! Great job!
+                            <div className="mt-3 text-center">
+                              <div className="text-green-600 font-serif text-lg">
+                                ✅ Correct! Great job!
+                              </div>
+                              <div className="text-sm text-stone-400 mt-1">
+                                Press Enter or Space to continue
+                              </div>
                             </div>
                           )}
                           {feedbackStatus === 'wrong' && (
@@ -1137,7 +1179,7 @@ export default function StudyPage() {
 
                   <div className="flex-1 mx-8">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-stone-500">Progress</span>
+                      <span className="text-sm text-stone-500">{isLearnChinese ? 'Progress' : '进度'}</span>
                       <span className="text-sm text-stone-500">{currentIndex + 1} / {totalItems}</span>
                     </div>
                     <div className="h-2 bg-stone-200 rounded-full overflow-hidden">

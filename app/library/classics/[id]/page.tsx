@@ -149,10 +149,14 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
   }, [vocabList])
 
   useEffect(() => {
+    const controller = new AbortController()
+    
     const load = async () => {
       try {
         setLoading(true)
-        const res = await fetch(`/api/articles/${resolvedParams.id}`)
+        const res = await fetch(`/api/articles/${resolvedParams.id}`, {
+          signal: controller.signal
+        })
         if (!res.ok) throw new Error("Fetch failed")
         const raw: any = await res.json()
         
@@ -234,13 +238,22 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
           content_zh: cZh,
           category: cat
         })
-      } catch (e) {
+      } catch (e: any) {
+        // 忽略请求取消错误
+        if (e.name === 'AbortError') {
+          console.log('🚫 请求被取消')
+          return
+        }
         console.error(e)
       } finally {
         setLoading(false)
       }
     }
     load()
+    
+    return () => {
+      controller.abort()
+    }
   }, [resolvedParams.id])
 
   if (loading) return <Loading />
