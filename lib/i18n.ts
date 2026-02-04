@@ -47,7 +47,13 @@ export const TRANSLATIONS = {
       password_too_short: "密码长度至少为6位",
       password_not_match: "两次输入的密码不一致",
       register_success: "注册成功",
-      registering: "注册中..."
+      registering: "注册中...",
+      forgot_password: "忘记密码？"
+    },
+    
+    // 通用
+    common: {
+      optional: "可选"
     },
     
     // 欢迎页
@@ -267,7 +273,13 @@ export const TRANSLATIONS = {
       password_too_short: "Password must be at least 6 characters",
       password_not_match: "Passwords do not match",
       register_success: "Registration successful",
-      registering: "Registering..."
+      registering: "Registering...",
+      forgot_password: "Forgot password?"
+    },
+    
+    // 通用
+    common: {
+      optional: "Optional"
     },
     
     // 欢迎页
