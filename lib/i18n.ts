@@ -51,11 +51,6 @@ export const TRANSLATIONS = {
       forgot_password: "忘记密码？"
     },
     
-    // 通用
-    common: {
-      optional: "可选"
-    },
-    
     // 欢迎页
     welcome: {
       start: "开始学习",
@@ -228,7 +223,8 @@ export const TRANSLATIONS = {
       back: "返回",
       loading: "加载中...",
       processing: "处理中...",
-      user: "修行者"
+      user: "修行者",
+      optional: "可选"
     }
   },
 
@@ -275,11 +271,6 @@ export const TRANSLATIONS = {
       register_success: "Registration successful",
       registering: "Registering...",
       forgot_password: "Forgot password?"
-    },
-    
-    // 通用
-    common: {
-      optional: "Optional"
     },
     
     // 欢迎页
@@ -454,7 +445,8 @@ export const TRANSLATIONS = {
       back: "Back",
       loading: "Loading...",
       processing: "Processing...",
-      user: "Cultivator"
+      user: "Cultivator",
+      optional: "Optional"
     }
   }
 } as const
