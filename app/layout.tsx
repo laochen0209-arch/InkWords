@@ -4,6 +4,7 @@ import { ToastProvider } from "@/components/ink-toast/toast-context"
 import { GlobalClickEffect } from "@/components/global-click-effect"
 import { LanguageProvider } from "@/lib/contexts/language-context"
 import { AuthProvider } from "@/lib/contexts/auth-context"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 export const metadata: Metadata = {
   title: "墨语 InkWords",
   description: "极简东方美学语言学习",
@@ -22,6 +23,7 @@ export default function RootLayout({
               <ToastProvider>
                 {children}
               </ToastProvider>
+            <SpeedInsights />
           </body>
         </html>
       </LanguageProvider>
