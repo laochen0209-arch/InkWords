@@ -144,11 +144,7 @@ export default function RootLayout({
                   {children}
                 </ToastProvider>
               </TidioProvider>
-              <Script 
-                src="https://app.lemonsqueezy.com/js/lemon.js" 
-                strategy="lazyOnload"
-                defer
-              />
+
             </body>
           </html>
         </LanguageProvider>

@@ -13,9 +13,6 @@
 export default function PreloadResources() {
   return (
     <>
-      {/* DNS 预解析 */}
-      <link rel="dns-prefetch" href="https://app.lemonsqueezy.com" />
-
       {/* 预连接关键域名 */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
