@@ -1,0 +1,12 @@
+- [x] GumroadButton component created with proper TypeScript types
+- [x] GumroadButton includes Gumroad JS script
+- [x] GumroadButton accepts userId prop and passes it to href
+- [x] GumroadButton has data-gumroad-overlay-checkout="true" attribute
+- [x] Profile page imports and uses GumroadButton
+- [x] Profile page passes correct user.id to GumroadButton
+- [x] Gumroad webhook route created at app/api/webhooks/gumroad/route.ts
+- [x] Webhook handler parses formData correctly
+- [x] Webhook uses Supabase admin client with SERVICE_ROLE_KEY
+- [x] Webhook updates user is_vip field to true
+- [x] Webhook returns 200 status code on success
+- [ ] Gumroad product link is configured (user needs to replace placeholder)

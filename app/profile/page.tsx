@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
 import { ProfileHeader } from "@/components/profile/profile-header"
 import { VipBanner } from "@/components/profile/vip-banner"
@@ -10,12 +9,13 @@ import { useToast } from "@/components/ink-toast/toast-context"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
+import GumroadButton from "@/components/GumroadButton"
 
 type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 
 /**
  * 个人中心页面
- * 
+ *
  * 功能：
  * - 显示用户头像、昵称、ID
  * - 显示学习统计数据
@@ -24,17 +24,12 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
  * - 退出登录
  */
 export default function ProfilePage() {
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>("profile")
   const toast = useToast()
   const { learningMode } = useLanguage()
   const { user, isVip, isAuthenticated } = useAuth()
 
   const t = TRANSLATIONS[learningMode]
-
-  const handleVipClick = () => {
-    router.push('/subscription')
-  }
 
   const handleLogout = () => {
     if (confirm(t.auth.logoutConfirm)) {
@@ -61,15 +56,22 @@ export default function ProfilePage() {
           <div className="w-full max-w-2xl mx-auto">
             <ProfileHeader />
             
-            <div
-              onClick={handleVipClick}
-              className="w-full cursor-pointer"
-            >
-              <VipBanner 
-                isVip={isVip}
-                expiryDate={user?.current_period_end}
-              />
-            </div>
+            {/* VIP Banner - 已登录用户显示升级按钮或VIP状态 */}
+            {user?.id && !isVip ? (
+              <div className="w-full px-4 mb-4">
+                {/* TODO: 请替换为实际的 Gumroad 产品链接 */}
+                <GumroadButton userId={user.id} className="w-full">
+                  开通 Pro 会员
+                </GumroadButton>
+              </div>
+            ) : (
+              <div className="w-full cursor-pointer">
+                <VipBanner
+                  isVip={isVip}
+                  expiryDate={user?.current_period_end}
+                />
+              </div>
+            )}
             
             <div className="px-4 mt-6">
               <SettingsList />
