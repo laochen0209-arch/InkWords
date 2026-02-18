@@ -78,6 +78,8 @@ export default function PayPalCheckoutButton({
   /**
    * 支付批准回调
    * 当用户完成 PayPal 支付流程后触发
+   * 
+   * 【优化】支付成功后显示明显提示并硬刷新页面
    */
   const onApprove = async (data: { orderID: string }): Promise<void> => {
     try {
@@ -101,17 +103,27 @@ export default function PayPalCheckoutButton({
       }
 
       const result = await response.json();
-      console.log("[PayPal] 支付处理成功:", result);
+      console.log("[PayPal] 支付处理结果:", result);
 
-      // 显示成功提示
-      toast.success("开通 VIP 成功！", {
-        description: "您已成功开通 VIP 会员，享受全部特权。",
-      });
+      // 【优化】确认支付成功后，显示明显的成功提示
+      if (result.success) {
+        // 显示极其明显的成功提示
+        toast.success("🎉 恭喜！Pro 会员开通成功！", {
+          description: "您已成功开通 VIP 会员，享受全部特权。",
+          duration: 3000, // 显示 3 秒
+        });
 
-      // 刷新页面以更新用户状态
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+        // 【优化】1.5 秒后执行硬刷新，跳过 Next.js 路由缓存
+        setTimeout(() => {
+          console.log("[PayPal] 执行页面硬刷新...");
+          window.location.href = window.location.href;
+        }, 1500);
+      } else {
+        // 支付未完成（如 PENDING 状态）
+        toast.info("支付处理中，请稍后查看会员状态", {
+          description: `当前状态: ${result.status}`,
+        });
+      }
     } catch (error) {
       console.error("[PayPal] 支付处理失败:", error);
       toast.error("支付处理失败，请联系客服");
