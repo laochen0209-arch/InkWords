@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 获取用户信息
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('id, email, name, stripe_customer_id')
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${baseUrl}/dashboard?success=true`,
+      success_url: `${baseUrl}/profile?success=true`,
       cancel_url: `${baseUrl}/pricing`,
       metadata: {
         userId: userId,

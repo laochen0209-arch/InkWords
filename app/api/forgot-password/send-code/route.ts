@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   console.log('[FORGOT PASSWORD SEND CODE API] 收到发送验证码请求')
 
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const body = await request.json()
     const { email } = body
 

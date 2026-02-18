@@ -10,7 +10,7 @@ export const TRANSLATIONS = {
     // 导航栏
     nav: {
       home: "首页",
-      practice: "修习",
+      practice: "备考中心",
       study: "学习",
       library: "文库",
       settings: "设置",
@@ -58,7 +58,7 @@ export const TRANSLATIONS = {
       selectLanguage: "选择您的学习目标",
       learnEnglish: "学习英语",
       learnChinese: "学习中文",
-      footerText: "© 2025 墨语. 保留所有权利."
+      footerText: "© 2026 墨语. 保留所有权利."
     },
 
     // 仪表盘
@@ -137,6 +137,7 @@ export const TRANSLATIONS = {
     // 设置页
     settings: {
       title: "设置",
+      subtitle: "个性化你的墨语体验",
       languages: "语言设置",
       appearance: "外观设置",
       account: "账号设置",
@@ -144,7 +145,60 @@ export const TRANSLATIONS = {
       about: "关于墨语",
       nativeLanguage: "我的母语",
       targetLanguage: "学习语言",
-      saved: "学习方向已切换"
+      saved: "学习方向已切换",
+      items: {
+        account: {
+          title: "账号设置",
+          description: "管理个人信息、绑定手机号"
+        },
+        password: {
+          title: "登录密码",
+          description: "修改密码、保障账号安全"
+        },
+        notification: {
+          title: "通知设置",
+          description: "推送提醒、签到通知"
+        },
+        study: {
+          title: "学习设置",
+          description: "每日目标、复习频率"
+        },
+        appearance: {
+          title: "外观设置",
+          description: "主题切换、字体大小"
+        },
+        about: {
+          title: "关于墨语",
+          description: "版本信息、用户协议"
+        }
+      },
+      changePassword: {
+        title: "修改密码",
+        subtitle: "验证身份后设置新密码",
+        currentEmail: "当前邮箱",
+        verificationCode: "验证码",
+        newPassword: "新密码",
+        confirmPassword: "确认新密码",
+        sendCode: "发送验证码",
+        confirmChange: "确认修改",
+        cancel: "取消",
+        passwordPlaceholder: "请输入新密码（至少6位）",
+        confirmPlaceholder: "请再次输入新密码",
+        codePlaceholder: "请输入6位验证码"
+      }
+    },
+    
+    // 生词本页
+    vocabulary: {
+      title: "生词本",
+      totalWords: "共收藏",
+      masteredWords: "已掌握",
+      words: "词",
+      empty: "暂无收藏的单词",
+      addHint: "在阅读时点击单词即可收藏",
+      play: "播放发音",
+      remove: "移除",
+      master: "已掌握"
     },
     
     // 个人资料页
@@ -224,7 +278,8 @@ export const TRANSLATIONS = {
       loading: "加载中...",
       processing: "处理中...",
       user: "修行者",
-      optional: "可选"
+      optional: "可选",
+      success: "成功"
     }
   },
 
@@ -232,7 +287,7 @@ export const TRANSLATIONS = {
     // 导航栏
     nav: {
       home: "Home",
-      practice: "Practice",
+      practice: "Test Center",
       study: "Study",
       library: "Library",
       settings: "Settings",
@@ -359,6 +414,7 @@ export const TRANSLATIONS = {
     // 设置页
     settings: {
       title: "Settings",
+      subtitle: "Personalize your InkWords experience",
       languages: "Language Settings",
       appearance: "Appearance",
       account: "Account Settings",
@@ -366,7 +422,60 @@ export const TRANSLATIONS = {
       about: "About InkWords",
       nativeLanguage: "My Native Language",
       targetLanguage: "Target Language",
-      saved: "Learning direction switched"
+      saved: "Learning direction switched",
+      items: {
+        account: {
+          title: "Account Settings",
+          description: "Manage personal info, link phone number"
+        },
+        password: {
+          title: "Password",
+          description: "Change password, secure your account"
+        },
+        notification: {
+          title: "Notifications",
+          description: "Push reminders, check-in alerts"
+        },
+        study: {
+          title: "Study Settings",
+          description: "Daily goals, review frequency"
+        },
+        appearance: {
+          title: "Appearance",
+          description: "Theme switching, font size"
+        },
+        about: {
+          title: "About InkWords",
+          description: "Version info, user agreement"
+        }
+      },
+      changePassword: {
+        title: "Change Password",
+        subtitle: "Verify identity to set new password",
+        currentEmail: "Current Email",
+        verificationCode: "Verification Code",
+        newPassword: "New Password",
+        confirmPassword: "Confirm Password",
+        sendCode: "Send Code",
+        confirmChange: "Confirm Change",
+        cancel: "Cancel",
+        passwordPlaceholder: "Enter new password (at least 6 characters)",
+        confirmPlaceholder: "Enter new password again",
+        codePlaceholder: "Enter 6-digit code"
+      }
+    },
+    
+    // 生词本页
+    vocabulary: {
+      title: "Vocabulary",
+      totalWords: "Total Saved",
+      masteredWords: "Mastered",
+      words: "words",
+      empty: "No saved words yet",
+      addHint: "Tap words while reading to save them",
+      play: "Play pronunciation",
+      remove: "Remove",
+      master: "Mastered"
     },
     
     // 个人资料页
@@ -446,7 +555,8 @@ export const TRANSLATIONS = {
       loading: "Loading...",
       processing: "Processing...",
       user: "Cultivator",
-      optional: "Optional"
+      optional: "Optional",
+      success: "Success"
     }
   }
 } as const

@@ -1,0 +1,45 @@
+{
+  "name": "墨语 InkWords - 智能语言学习平台",
+  "short_name": "墨语",
+  "description": "墨语 InkWords 是一个智能语言学习平台，提供沉浸式阅读、智能刷题、词汇管理等功能，帮助您高效学习语言。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFBF7",
+  "theme_color": "#C23E32",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/images/default-cover.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "开始学习",
+      "short_name": "学习",
+      "description": "快速进入学习页面",
+      "url": "/study",
+      "icons": [{ "src": "/images/default-cover.svg", "sizes": "any" }]
+    },
+    {
+      "name": "每日签到",
+      "short_name": "签到",
+      "description": "每日签到获取积分",
+      "url": "/checkin",
+      "icons": [{ "src": "/images/default-cover.svg", "sizes": "any" }]
+    },
+    {
+      "name": "智能刷题",
+      "short_name": "刷题",
+      "description": "进入智能刷题模式",
+      "url": "/practice",
+      "icons": [{ "src": "/images/default-cover.svg", "sizes": "any" }]
+    }
+  ]
+}

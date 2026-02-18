@@ -1,10 +1,20 @@
 "use client"
 
+/**
+ * @file page.tsx
+ * @description 新闻文章阅读页面
+ * @author InkWords Team
+ * @date 2026-02-08
+ * @version 2.1.0 - 修复背景图重叠问题
+ */
+
 import { useState, useEffect, use, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Type, ArrowLeft, Volume2, Sparkles } from "lucide-react"
 import { motion } from "framer-motion"
-import { InteractiveParagraph } from "@/components/reader/interactive-paragraph"
+import { recordRead } from "@/lib/user-stats"
+import { useAuth } from "@/lib/contexts/auth-context"
+import { logger } from "@/lib/logger"
 
 interface ArticleData {
   title_en: string
@@ -17,16 +27,120 @@ interface ArticleData {
 interface Para { en: string; zh: string }
 interface Vocab { word: string; mean: string }
 
+// 【关键修复】全局语音状态，确保所有组件共享
+let globalVoicesLoaded = false
+let globalVoices: SpeechSynthesisVoice[] = []
+
+/**
+ * 【关键修复】获取最佳语音
+ */
+const getBestVoice = (lang: string): SpeechSynthesisVoice | null => {
+  if (!globalVoicesLoaded || globalVoices.length === 0) {
+    globalVoices = window.speechSynthesis.getVoices()
+  }
+  
+  if (globalVoices.length === 0) return null
+  
+  // 优先 Google/Microsoft 语音
+  const googleVoice = globalVoices.find(v => 
+    v.lang === lang && v.name.toLowerCase().includes("google")
+  )
+  if (googleVoice) return googleVoice
+  
+  const microsoftVoice = globalVoices.find(v => 
+    v.lang === lang && v.name.toLowerCase().includes("microsoft")
+  )
+  if (microsoftVoice) return microsoftVoice
+  
+  // 回退到第一个匹配的语音
+  return globalVoices.find(v => v.lang === lang) || null
+}
+
+/**
+ * 【关键修复】语音播放函数，添加预加载和错误处理
+ */
 const speak = (text: string, lang = 'zh-CN') => {
-  if (!text) return
-  window.speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = lang
-  const voices = window.speechSynthesis.getVoices()
-  const bestVoice = voices.find(v => v.lang.includes(lang.replace('-', '_')) || v.lang.includes(lang))
-  if (bestVoice) u.voice = bestVoice
-  u.rate = lang === 'en-US' ? 1.0 : 0.9
-  window.speechSynthesis.speak(u)
+  if (!text || typeof window === 'undefined') return
+  
+  try {
+    // 【关键修复】停止之前的播放
+    window.speechSynthesis.cancel()
+    
+    // 【关键修复】Chrome 浏览器需要 resume
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+    }
+    
+    // 【关键修复】确保语音列表已加载
+    if (!globalVoicesLoaded) {
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        globalVoices = voices
+        globalVoicesLoaded = true
+      }
+    }
+    
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = lang
+    
+    // 【关键修复】设置最佳语音
+    const bestVoice = getBestVoice(lang)
+    if (bestVoice) {
+      u.voice = bestVoice
+      logger.log('[News Speak] 使用语音:', bestVoice.name)
+    }
+    
+    u.rate = lang === 'en-US' ? 1.0 : 0.9
+    u.pitch = 1.0
+    u.volume = 1.0
+    
+    // 错误处理
+    u.onerror = (event) => {
+      if (event.error === 'interrupted' || event.error === 'canceled') {
+        logger.log('[News Speak] 播放被中断（正常）')
+      } else {
+        logger.error('[News Speak] 播放错误:', event.error)
+      }
+    }
+    
+    // 【关键修复】使用 setTimeout 确保在用户交互上下文中执行
+    setTimeout(() => {
+      try {
+        window.speechSynthesis.speak(u)
+        logger.log('[News Speak] 播放:', text.substring(0, 30) + '...')
+      } catch (error) {
+        logger.error('[News Speak] 播放失败:', error)
+      }
+    }, 10)
+  } catch (error) {
+    logger.error('[News Speak] 播放失败:', error)
+  }
+}
+
+/**
+ * 【关键修复】预加载语音列表
+ */
+const preloadVoices = () => {
+  if (typeof window === 'undefined') return
+  
+  const loadVoices = () => {
+    const voices = window.speechSynthesis.getVoices()
+    if (voices.length > 0) {
+      globalVoices = voices
+      globalVoicesLoaded = true
+      logger.log('[News Speak] 语音列表已加载:', voices.length)
+    }
+  }
+  
+  loadVoices()
+  
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    const originalHandler = window.speechSynthesis.onvoiceschanged
+    window.speechSynthesis.onvoiceschanged = (ev) => {
+      loadVoices()
+      if (originalHandler) originalHandler.call(window.speechSynthesis, ev)
+    }
+  }
 }
 
 const RenderEnglish = ({ text, vocabMap, fontSize }: { text: string, vocabMap: Map<string, string>, fontSize: string }) => {
@@ -129,6 +243,7 @@ const Loading = () => (
 export default function UnifiedReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const resolvedParams = use(params)
+  const { user } = useAuth()
 
   const [article, setArticle] = useState<ArticleData | null>(null)
   const [paras, setParas] = useState<Para[]>([])
@@ -137,7 +252,8 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
   const [size, setSize] = useState<"lg" | "xl">("lg")
 
   useEffect(() => {
-    if (typeof window !== 'undefined') window.speechSynthesis.getVoices()
+    // 【关键修复】预加载语音列表
+    preloadVoices()
   }, [])
 
   const vocabMap = useMemo(() => {
@@ -173,7 +289,7 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
         const tZh = raw.titleZh || raw.title_zh || ""
         const cat = raw.category || "STORY"
         
-        console.log('原始数据:', { 
+        logger.log('原始数据:', { 
           contentEn: cEn.substring(0, 200), 
           contentZh: cZh.substring(0, 200),
           titleEn: tEn,
@@ -193,7 +309,7 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
             }
           }
         } catch (e) {
-          console.error("JSON 解析失败:", e)
+          logger.error("JSON 解析失败:", e)
           // JSON 解析失败，使用备用方案
         }
         
@@ -234,8 +350,18 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
           content_zh: cZh,
           category: cat
         })
+
+        // 记录阅读活动
+        try {
+          if (user?.id) {
+            await recordRead(1, user.id)
+            logger.log('[News] 阅读记录已更新')
+          }
+        } catch (error) {
+          logger.error('[News] 更新阅读记录失败:', error)
+        }
       } catch (e) {
-        console.error(e)
+        logger.error(e)
       } finally {
         setLoading(false)
       }
@@ -249,8 +375,8 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
   const zhTextSize = size === 'xl' ? 'text-xl' : 'text-lg'
 
   return (
-    <div className="min-h-screen" style={{ backgroundImage: 'url("/去文字.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      <header className="fixed top-0 inset-x-0 z-50 h-16 bg-[#FDFBF7]/25 backdrop-blur-md border-b border-stone-200/50 flex items-center justify-between px-4">
+    <div className="min-h-screen bg-[#FDFBF7] ink-landscape-bg">
+      <header className="fixed top-0 inset-x-0 z-50 h-16 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-stone-200/50 flex items-center justify-between px-4">
         <button onClick={() => router.back()} className="p-2 rounded-full hover:bg-stone-100 transition-colors"><ArrowLeft className="w-6 h-6 text-stone-600" /></button>
         <div className="text-center">
           <div className="font-serif font-bold text-stone-800 max-w-[200px] truncate">{article.title_en}</div>
@@ -276,14 +402,14 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="bg-[#FDFBF7]/60 backdrop-blur-sm rounded-2xl shadow-sm border border-stone-200/50 overflow-hidden hover:shadow-md transition-shadow"
+              className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-stone-200/50 overflow-hidden hover:shadow-md transition-shadow"
             >
               <div className="p-6 pb-4">
                 <RenderEnglish text={p.en} vocabMap={vocabMap} fontSize={size} />
               </div>
               {p.en && p.zh && <div className="h-px bg-stone-200 mx-6" />}
               {p.zh && (
-                <div className="p-6 pt-4 bg-[#FDFBF7]/40">
+                <div className="p-6 pt-4 bg-stone-50/50">
                   <RenderChinese text={p.zh} fontSize={zhTextSize} />
                 </div>
               )}
@@ -292,7 +418,7 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
         </div>
 
         {paras.length === 0 && (
-          <div className="p-8 text-center bg-[#FDFBF7]/60 rounded-2xl shadow-sm border border-stone-200/50">
+          <div className="p-8 text-center bg-white/70 rounded-2xl shadow-sm border border-stone-200/50">
             <p className="text-stone-400 mb-2">Generating Content...</p>
             <p className="text-xs text-stone-300">Please wait for N8N to finish story.</p>
           </div>

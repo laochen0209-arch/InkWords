@@ -8,15 +8,27 @@ import { VipBanner } from "@/components/profile/vip-banner"
 import { SettingsList } from "@/components/profile/settings-list"
 import { useToast } from "@/components/ink-toast/toast-context"
 import { useLanguage } from "@/lib/contexts/language-context"
+import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 
-type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in"
+type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 
+/**
+ * 个人中心页面
+ * 
+ * 功能：
+ * - 显示用户头像、昵称、ID
+ * - 显示学习统计数据
+ * - VIP 状态显示和到期时间
+ * - 设置列表
+ * - 退出登录
+ */
 export default function ProfilePage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>("profile")
   const toast = useToast()
   const { learningMode } = useLanguage()
+  const { user, isVip, isAuthenticated } = useAuth()
 
   const t = TRANSLATIONS[learningMode]
 
@@ -29,6 +41,7 @@ export default function ProfilePage() {
       localStorage.removeItem("isLoggedIn")
       localStorage.removeItem("inkwords_token")
       localStorage.removeItem("inkwords_user")
+      localStorage.removeItem("inkwords_email")
       toast.success(t.auth.logoutSuccess)
       setTimeout(() => {
         window.location.href = "/"
@@ -52,7 +65,10 @@ export default function ProfilePage() {
               onClick={handleVipClick}
               className="w-full cursor-pointer"
             >
-              <VipBanner />
+              <VipBanner 
+                isVip={isVip}
+                expiryDate={user?.current_period_end}
+              />
             </div>
             
             <div className="px-4 mt-6">

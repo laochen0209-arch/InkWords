@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { ReaderHeader } from "@/components/reader/reader-header"
 import { ReaderContent } from "@/components/reader/reader-content"
@@ -8,6 +8,7 @@ import { ReaderToolbar } from "@/components/reader/reader-toolbar"
 import { useParams } from "next/navigation"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
+import { logUserActivity } from "@/lib/supabase"
 
 const classicsContent: Record<string, {
   title: string
@@ -233,11 +234,34 @@ export default function ReaderPage() {
 
   const t = TRANSLATIONS[learningMode]
 
+  // 用于跟踪阅读完成记录是否已发送
+  const hasLoggedRead = useRef(false)
+
   useEffect(() => {
     if (classicsContent[articleId]) {
       setCurrentContent(classicsContent[articleId])
     }
   }, [articleId])
+
+  // 记录古诗词阅读完成 - 页面停留超过 30 秒
+  useEffect(() => {
+    if (!currentContent || hasLoggedRead.current) return
+
+    // 设置 30 秒计时器
+    const timer = setTimeout(() => {
+      logUserActivity(
+        'read_article',
+        articleId,
+        {
+          title: currentContent.title,
+          category: '古诗词'
+        }
+      )
+      hasLoggedRead.current = true
+    }, 30000) // 30 秒
+
+    return () => clearTimeout(timer)
+  }, [currentContent, articleId])
 
   const handlePlay = (id: number) => {
     setIsPlaying(id)

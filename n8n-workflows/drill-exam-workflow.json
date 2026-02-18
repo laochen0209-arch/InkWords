@@ -1,0 +1,168 @@
+{
+  "name": "InkWords_DrillExam_Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hours": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [-220, 0],
+      "id": "timer-drill",
+      "name": "⏱️ 每6小时生成"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "exam_types",
+              "value": "IELTS,TOEFL,CET-4,CET-6,HSK,BCT,TOCFL"
+            }
+          ],
+          "number": [
+            {
+              "name": "batch_limit",
+              "value": 7
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "config-drill",
+      "name": "配置: 考试类型"
+    },
+    {
+      "parameters": {
+        "jsCode": "const examTypes = $('配置: 考试类型').first().json.exam_types.split(',');\nconst limit = $('配置: 考试类型').first().json.batch_limit;\n\n// 为每种考试类型生成一个任务\nconst items = examTypes.slice(0, limit).map((type, index) => ({\n  json: {\n    exam_type: type.trim(),\n    index: index\n  }\n}));\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "id": "split-exam-types",
+      "name": "🔄 拆分考试类型"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [440, 0],
+      "id": "process-each-type",
+      "name": "逐类型处理"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_DEEPSEEK_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "deepseek-chat"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [\n  {\n    \"role\": \"system\",\n    \"content\": \"你是一个专业的语言考试命题专家。请为指定考试类型生成一套完整的综合模拟试卷，严格遵循以下JSON结构。\\n\\n## 试卷结构要求\\n\\n返回的JSON必须包含 `sections` 数组，包含以下三个部分：\\n\\n### Section 1: 听力 (listening)\\n- type: 'listening'\\n- title: '听力理解 (Listening Comprehension)'\\n- transcript: 一段150-200词的英文对话或独白（适合该考试难度）\\n- questions: 3道选择题，基于听力内容\\n  - type: 'multiple_choice'\\n  - 每题4个选项 (A/B/C/D)\\n  - 包含正确答案和详细解析\\n\\n### Section 2: 阅读 (reading)\\n- type: 'reading'\\n- title: '阅读理解 (Reading Comprehension)'\\n- content: 一篇约300词的英文短文（适合该考试难度）\\n- questions: 4道题\\n  - 2道判断题 (type: 'true_false')，选项为 ['True', 'False']\\n  - 2道选择题 (type: 'multiple_choice')，每题4个选项\\n  - 包含正确答案和详细解析\\n\\n### Section 3: 词汇 (vocabulary)\\n- type: 'vocabulary'\\n- title: '词汇运用 (Vocabulary)'\\n- questions: 3道填空题\\n  - type: 'fill_blank'\\n  - stem: 包含____的句子，需要填写正确单词\\n  - 不包含options字段\\n  - 包含正确答案和详细解析\\n\\n## 题目格式示例\\n\\n选择题：\\n{\\n  \\\"id\\\": \\\"l1\\\",\\n  \\\"type\\\": \\\"multiple_choice\\\",\\n  \\\"stem\\\": \\\"What is the main topic of the conversation?\\\",\\n  \\\"options\\\": [\\\"A. Weather changes\\\", \\\"B. Travel plans\\\", \\\"C. Work schedule\\\", \\\"D. Hobbies\\\"],\\n  \\\"answer\\\": \\\"B\\\",\\n  \\\"analysis\\\": \\\"The speakers mainly discuss their upcoming trip to Paris...\\\"\\n}\\n\\n判断题：\\n{\\n  \\\"id\\\": \\\"r1\\\",\\n  \\\"type\\\": \\\"true_false\\\",\\n  \\\"stem\\\": \\\"The author believes technology is always beneficial.\\\",\\n  \\\"options\\\": [\\\"True\\\", \\\"False\\\"],\\n  \\\"answer\\\": \\\"False\\\",\\n  \\\"analysis\\\": \\\"The author mentions both benefits and drawbacks of technology...\\\"\\n}\\n\\n填空题：\\n{\\n  \\\"id\\\": \\\"v1\\\",\\n  \\\"type\\\": \\\"fill_blank\\\",\\n  \\\"stem\\\": \\\"The _____ of the project took longer than expected.\\\",\\n  \\\"answer\\\": \\\"completion\\\",\\n  \\\"analysis\\\": \\\"'Completion' means the act of finishing something...\\\"\\n}\\n\\n## 注意事项\\n1. 所有题目必须符合指定考试类型的难度水平\\n2. 听力原文要有明确的场景（如校园、职场、日常生活）\\n3. 阅读文章要有清晰的结构和主题\\n4. 词汇填空题要考察常用词汇的准确用法\\n5. 只输出纯JSON，不要包含 ```json 代码块标记\\n6. 确保JSON格式完整且可解析\\\"\n  },\n  {\n    \"role\": \"user\",\n    \"content\": \"={{ `请为 ${ $json.exam_type } 考试完整的综合模拟试卷，包含听力、阅读、词汇三个部分。\\n\\n要求：\\n1. 听力部分：一段对话或独白 + 3道选择题\\n2. 阅读部分：一篇300词短文 + 2道判断题 + 2道选择题\\n3. 词汇部分：3道填空题\\n\\n请严格按照system消息中的JSON格式返回。\"\n  }\n] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {\"type\": \"json_object\"} }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [660, 0],
+      "id": "deepseek-generate",
+      "name": "🤖 DeepSeek 生成试卷"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🧹 暴力清洗解析\nconst raw = items[0].json.choices[0].message.content;\n\n// 去除非法字符\nconst clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();\n\n// 解析成对象\nlet data = {};\ntry {\n  data = JSON.parse(clean);\n} catch (e) {\n  console.error('JSON解析错误:', e);\n  data = {\n    sections: []\n  };\n}\n\n// 获取考试类型\nconst examType = $('逐类型处理').item.json.exam_type;\n\n// 确保sections存在\nif (!data.sections || !Array.isArray(data.sections)) {\n  data.sections = [];\n}\n\n// 输出纯净数据\nreturn [{\n  json: {\n    exam_type: examType,\n    sections: data.sections\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "id": "clean-response",
+      "name": "📦 清洗响应数据"
+    },
+    {
+      "parameters": {
+        "tableId": "mock_exams",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "exam_type": "={{ $json.exam_type }}",
+            "sections": "={{ JSON.stringify($json.sections) }}",
+            "title_en": "={{ 'Comprehensive Drill - ' + $json.exam_type }}",
+            "rewritten_content": "={{ 'Comprehensive mock exam with listening, reading, and vocabulary sections.' }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "id": "supabase-insert",
+      "name": "💾 入库 mock_exams",
+      "credentials": {
+        "supabaseApi": {
+          "id": "Supabase account",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "⏱️ 每6小时生成": {
+      "main": [[{ "node": "配置: 考试类型", "type": "main", "index": 0 }]]
+    },
+    "配置: 考试类型": {
+      "main": [[{ "node": "🔄 拆分考试类型", "type": "main", "index": 0 }]]
+    },
+    "🔄 拆分考试类型": {
+      "main": [[{ "node": "逐类型处理", "type": "main", "index": 0 }]]
+    },
+    "逐类型处理": {
+      "main": [[{ "node": "🤖 DeepSeek 生成试卷", "type": "main", "index": 0 }]]
+    },
+    "🤖 DeepSeek 生成试卷": {
+      "main": [[{ "node": "📦 清洗响应数据", "type": "main", "index": 0 }]]
+    },
+    "📦 清洗响应数据": {
+      "main": [[{ "node": "💾 入库 mock_exams", "type": "main", "index": 0 }]]
+    },
+    "💾 入库 mock_exams": {
+      "main": [[{ "node": "逐类型处理", "type": "main", "index": 0 }]]
+    }
+  }
+}

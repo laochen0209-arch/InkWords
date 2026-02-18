@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { createServerClient } from '@/lib/supabase/server'
 
 /**
  * 进度项类型
@@ -22,6 +22,7 @@ interface ProgressItem {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createServerClient()
     const userId = request.headers.get('x-user-id')
     
     if (!userId) {
@@ -41,59 +42,81 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 记录学习进度
-    const progress = await prisma.userProgress.upsert({
-      where: {
-        userId_category_contentType_contentId: {
-          userId,
+    // 检查是否已存在进度记录
+    const { data: existingProgress } = await supabase
+      .from('user_progress')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('category', category)
+      .eq('content_type', contentType)
+      .eq('content_id', contentId)
+      .single()
+
+    if (existingProgress) {
+      // 更新现有记录
+      await supabase
+        .from('user_progress')
+        .update({
+          is_learned: true,
+          learned_at: new Date().toISOString()
+        })
+        .eq('id', existingProgress.id)
+    } else {
+      // 创建新记录
+      await supabase
+        .from('user_progress')
+        .insert({
+          user_id: userId,
           category,
-          contentType,
-          contentId,
-        },
-      },
-      update: {
-        isLearned: true,
-        learnedAt: new Date(),
-      },
-      create: {
-        userId,
-        category,
-        contentType,
-        contentId,
-        isLearned: true,
-        learnedAt: new Date(),
-      },
-    })
+          content_type: contentType,
+          content_id: contentId,
+          is_learned: true,
+          learned_at: new Date().toISOString()
+        })
+    }
 
     // 更新今日学习统计
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().split('T')[0]
 
-    await prisma.userStudyStats.upsert({
-      where: {
-        userId_date: {
-          userId,
-          date: today,
-        },
-      },
-      update: {
-        [contentType === 'word' ? 'wordsLearned' : 'sentencesLearned']: {
-          increment: 1,
-        },
-        totalLearned: {
-          increment: 1,
-        },
-      },
-      create: {
-        userId,
-        date: today,
-        [contentType === 'word' ? 'wordsLearned' : 'sentencesLearned']: 1,
-        totalLearned: 1,
-      },
-    })
+    const { data: existingStats } = await supabase
+      .from('user_study_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', todayStr)
+      .single()
+
+    if (existingStats) {
+      // 更新现有统计
+      const updateData: any = {
+        total_learned: (existingStats.total_learned || 0) + 1
+      }
+      if (contentType === 'word') {
+        updateData.words_learned = (existingStats.words_learned || 0) + 1
+      } else {
+        updateData.sentences_learned = (existingStats.sentences_learned || 0) + 1
+      }
+      
+      await supabase
+        .from('user_study_stats')
+        .update(updateData)
+        .eq('id', existingStats.id)
+    } else {
+      // 创建新统计记录
+      await supabase
+        .from('user_study_stats')
+        .insert({
+          user_id: userId,
+          date: todayStr,
+          words_learned: contentType === 'word' ? 1 : 0,
+          sentences_learned: contentType === 'sentence' ? 1 : 0,
+          total_learned: 1
+        })
+    }
 
     return NextResponse.json(
-      { success: true, progress },
+      { success: true },
       { status: 200 }
     )
   } catch (error) {
@@ -111,11 +134,12 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createServerClient()
     const userId = request.headers.get('x-user-id')
     
     if (!userId) {
       return NextResponse.json(
-        { learnedIds: [] },
+        { learnedIds: { words: [], sentences: [] } },
         { status: 200 }
       )
     }
@@ -123,32 +147,30 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
 
-    const whereClause: {
-      userId: string
-      isLearned: boolean
-      category?: string
-    } = {
-      userId,
-      isLearned: true,
-    }
+    let query = supabase
+      .from('user_progress')
+      .select('content_type, content_id, learned_at')
+      .eq('user_id', userId)
+      .eq('is_learned', true)
 
     if (category) {
-      whereClause.category = category
+      query = query.eq('category', category)
     }
 
-    const progress = await prisma.userProgress.findMany({
-      where: whereClause,
-      select: {
-        contentType: true,
-        contentId: true,
-        learnedAt: true,
-      },
-    })
+    const { data: progress, error } = await query
+
+    if (error) {
+      console.error('获取学习进度失败:', error)
+      return NextResponse.json(
+        { learnedIds: { words: [], sentences: [] } },
+        { status: 200 }
+      )
+    }
 
     // 按类型分组
     const learnedIds = {
-      words: progress.filter((p: ProgressItem) => p.contentType === 'word').map((p: ProgressItem) => p.contentId),
-      sentences: progress.filter((p: ProgressItem) => p.contentType === 'sentence').map((p: ProgressItem) => p.contentId),
+      words: (progress || []).filter((p: any) => p.content_type === 'word').map((p: any) => p.content_id),
+      sentences: (progress || []).filter((p: any) => p.content_type === 'sentence').map((p: any) => p.content_id),
     }
 
     return NextResponse.json(
@@ -170,6 +192,7 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await createServerClient()
     const userId = request.headers.get('x-user-id')
     
     if (!userId) {
@@ -182,18 +205,16 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
 
-    const whereClause: {
-      userId: string
-      category?: string
-    } = { userId }
+    let query = supabase
+      .from('user_progress')
+      .delete()
+      .eq('user_id', userId)
 
     if (category) {
-      whereClause.category = category
+      query = query.eq('category', category)
     }
 
-    await prisma.userProgress.deleteMany({
-      where: whereClause,
-    })
+    await query
 
     return NextResponse.json(
       { success: true, message: '学习进度已重置' },

@@ -44,6 +44,9 @@ export default function OnboardingPage() {
           <p className="font-serif text-sm text-ink-gray/70 mt-3 tracking-wide">
             每日修行 · 文化传承
           </p>
+          <p className="font-serif text-xs text-ink-gray/50 mt-2 tracking-wider">
+            Daily Practice · Cultural Heritage
+          </p>
         </motion.div>
 
         <motion.div
@@ -59,6 +62,9 @@ export default function OnboardingPage() {
           >
             <p className="text-center text-base text-ink-gray/60 font-serif tracking-wider">
               点击选择学习语言
+            </p>
+            <p className="text-center text-xs text-ink-gray/40 font-serif tracking-wider mt-1">
+              Click to Select Learning Language
             </p>
           </motion.div>
 

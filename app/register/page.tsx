@@ -13,6 +13,7 @@ import { Mail, Lock, User, ShieldCheck, Loader2 } from "lucide-react"
  *
  * 文件说明：
  * 用户注册页面，支持邮箱验证码注册
+ * 优化了错误处理，将后端英文错误翻译为中文提示
  *
  * 功能：
  * - 邮箱格式验证
@@ -20,14 +21,14 @@ import { Mail, Lock, User, ShieldCheck, Loader2 } from "lucide-react"
  * - 验证码验证
  * - 密码确认
  * - 注册成功后自动登录
+ * - 智能错误翻译
  */
 export default function RegisterPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState(""
-  )
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [countdown, setCountdown] = useState(0)
@@ -35,6 +36,12 @@ export default function RegisterPage() {
   const router = useRouter()
   const toast = useToast()
   const { learningMode } = useLanguage()
+
+  // 调试：打印 learningMode
+  useEffect(() => {
+    console.log('[Register Page] learningMode:', learningMode)
+    console.log('[Register Page] localStorage:', localStorage.getItem('inkwords_learning_mode'))
+  }, [learningMode])
 
   const t = TRANSLATIONS[learningMode]
 
@@ -57,6 +64,100 @@ export default function RegisterPage() {
     } else {
       setEmailError("")
     }
+  }
+
+  /**
+   * 翻译错误信息
+   * 将后端返回的英文错误翻译为中文
+   */
+  const translateError = (errorMessage: string): string => {
+    // 【修复】处理空值情况
+    if (!errorMessage || typeof errorMessage !== 'string') {
+      return '注册失败，请稍后重试'
+    }
+    
+    const lowerMessage = errorMessage.toLowerCase()
+
+    // 密码相关错误
+    if (lowerMessage.includes('password should contain') ||
+        lowerMessage.includes('password should be at least') ||
+        lowerMessage.includes('weak password') ||
+        lowerMessage.includes('password is too weak')) {
+      return '密码太弱：请包含大写字母、小写字母和数字，且长度至少6位'
+    }
+
+    // 用户已存在
+    if (lowerMessage.includes('user already registered') ||
+        lowerMessage.includes('already exists') ||
+        lowerMessage.includes('already registered') ||
+        lowerMessage.includes('该邮箱已注册')) {
+      return '该邮箱已被注册，请直接登录'
+    }
+
+    // 验证码错误
+    if (lowerMessage.includes('verification code') ||
+        lowerMessage.includes('code') ||
+        lowerMessage.includes('验证码')) {
+      if (lowerMessage.includes('expired') || lowerMessage.includes('过期')) {
+        return '验证码已过期，请重新获取'
+      }
+      if (lowerMessage.includes('invalid') || lowerMessage.includes('error') || lowerMessage.includes('错误')) {
+        return '验证码错误，请重新输入'
+      }
+    }
+
+    // 邮箱格式错误
+    if (lowerMessage.includes('invalid email') ||
+        lowerMessage.includes('email format') ||
+        lowerMessage.includes('邮箱格式')) {
+      return '请输入有效的邮箱地址'
+    }
+
+    // 必填字段
+    if (lowerMessage.includes('required') ||
+        lowerMessage.includes('missing') ||
+        lowerMessage.includes('请填写')) {
+      return '请填写所有必填字段'
+    }
+
+    // 频率限制
+    if (lowerMessage.includes('rate limit') ||
+        lowerMessage.includes('too many requests') ||
+        lowerMessage.includes('尝试次数过多')) {
+      return '尝试次数过多，请稍后再试'
+    }
+
+    // 网络错误
+    if (lowerMessage.includes('network') ||
+        lowerMessage.includes('fetch') ||
+        lowerMessage.includes('connection')) {
+      return '网络连接失败，请检查网络后重试'
+    }
+
+    // 服务器错误
+    if (lowerMessage.includes('server error') ||
+        lowerMessage.includes('internal error') ||
+        lowerMessage.includes('服务器错误')) {
+      return '服务器繁忙，请稍后重试'
+    }
+
+    // 权限错误
+    if (lowerMessage.includes('permission') ||
+        lowerMessage.includes('unauthorized') ||
+        lowerMessage.includes('forbidden')) {
+      return '权限不足，请联系管理员'
+    }
+
+    // 数据库错误
+    if (lowerMessage.includes('database') ||
+        lowerMessage.includes('schema') ||
+        lowerMessage.includes('column')) {
+      return '系统配置错误，请联系管理员'
+    }
+
+    // 如果无法识别，返回原始错误（去除前缀）
+    const cleanedMessage = errorMessage.replace(/^注册失败:\s*/i, '').trim()
+    return cleanedMessage || '注册失败，请稍后重试'
   }
 
   /**
@@ -87,10 +188,13 @@ export default function RegisterPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || '发送验证码失败')
+        // 解析错误信息
+        const errorMessage = data.error || data.message || '发送验证码失败'
+        const translatedError = translateError(errorMessage)
+        throw new Error(translatedError)
       }
 
-      toast.success(t.auth.code_sent || '验证码已发送')
+      toast.success(t.auth.code_sent || '验证码已发送，请查看邮箱')
 
       // 开始倒计时
       setCountdown(60)
@@ -161,14 +265,24 @@ export default function RegisterPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || '注册失败')
+        // 解析后端错误信息
+        const errorMessage = data.error || data.message || '注册失败'
+        const translatedError = translateError(errorMessage)
+
+        console.error('[Register] 注册失败:', {
+          originalError: errorMessage,
+          translatedError: translatedError,
+          status: response.status
+        })
+
+        toast.error(translatedError)
+        return
       }
 
       toast.success(t.auth.register_success || '注册成功')
 
-      // 保存登录状态
-      localStorage.setItem('inkwords_user', JSON.stringify(data.user))
-      localStorage.setItem('isLoggedIn', 'true')
+      // 注意：不再手动操作 localStorage，完全依赖 Supabase 官方认证机制
+      // Supabase 会自动将 session 存储在浏览器中
 
       // 跳转到首页
       setTimeout(() => {
@@ -177,7 +291,11 @@ export default function RegisterPage() {
 
     } catch (error: any) {
       console.error('注册失败:', error)
-      toast.error(error.message || '注册失败')
+      // 【修复】确保传入 translateError 的是字符串
+      const errorMessage = error?.message || error?.toString() || '注册失败'
+      const translatedError = translateError(errorMessage)
+      toast.error(translatedError)
+    } finally {
       setIsLoading(false)
     }
   }
@@ -203,9 +321,11 @@ export default function RegisterPage() {
             className="space-y-5"
             onSubmit={handleRegister}
           >
-            {/* 用户名（可选） */}
+            {/* 昵称（可选） */}
             <div className="space-y-2">
-              <label htmlFor="name" className="sr-only">{t.auth.username_label}</label>
+              <label htmlFor="name" className="block text-sm font-medium text-stone-600 font-serif">
+                {t.auth.username_label || 'Nickname'} <span className="text-stone-400 text-xs">({t.common?.optional || 'Optional'})</span>
+              </label>
               <div className="relative">
                 <User className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-gray/50" />
                 <input
@@ -213,7 +333,7 @@ export default function RegisterPage() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={t.auth.username_label}
+                  placeholder={t.auth.username_label || 'Nickname'}
                   className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none pl-8 pr-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
                   autoComplete="name"
                 />
@@ -242,7 +362,7 @@ export default function RegisterPage() {
 
             {/* 验证码 */}
             <div className="space-y-2">
-              <label htmlFor="code" className="sr-only">{t.auth.verification_code || '验证码'}</label>
+              <label htmlFor="code" className="sr-only">{t.auth.verification_code}</label>
               <div className="relative flex gap-3">
                 <div className="relative flex-1">
                   <ShieldCheck className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-gray/50" />
@@ -251,7 +371,7 @@ export default function RegisterPage() {
                     type="text"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder={t.auth.verification_code || '验证码'}
+                    placeholder={t.auth.verification_code}
                     maxLength={6}
                     className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none pl-8 pr-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
                   />
@@ -267,7 +387,7 @@ export default function RegisterPage() {
                   ) : countdown > 0 ? (
                     `${countdown}s`
                   ) : (
-                    t.auth.send_code || '获取验证码'
+                    t.auth.send_code
                   )}
                 </button>
               </div>
@@ -315,7 +435,7 @@ export default function RegisterPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  {t.auth.registering || '注册中...'}
+                  {t.auth.registering}
                 </>
               ) : (
                 t.auth.register_btn
@@ -328,7 +448,7 @@ export default function RegisterPage() {
               {t.auth.have_account}
             </p>
             <Link
-              href="/login"
+              href="/auth"
               className="inline-block mt-2 px-6 py-2 bg-stone-100 text-ink-gray rounded-full font-serif text-sm hover:bg-stone-200 transition-colors"
             >
               {t.auth.login_now}

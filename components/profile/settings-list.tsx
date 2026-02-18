@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { getLanguageSettings } from "@/lib/language-utils"
+import { useNotifications } from "@/lib/hooks/use-notifications"
 
 interface SettingItem {
   id: string
@@ -14,7 +15,6 @@ interface SettingItem {
   label: string
   value?: string
   hasToggle?: boolean
-  defaultToggle?: boolean
   href?: string
 }
 
@@ -23,51 +23,84 @@ interface SettingsListProps {
 }
 
 export function SettingsList({ nativeLang }: SettingsListProps) {
-  const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({
-    notification: true,
-  })
   const [languageValue, setLanguageValue] = useState("")
   const { learningMode } = useLanguage()
+  const { 
+    state: notificationState, 
+    subscribe, 
+    unsubscribe,
+    sendTestNotification 
+  } = useNotifications()
 
   const t = TRANSLATIONS[learningMode]
 
-  const settingItems = [
+  // 【修复】提供安全的翻译获取函数
+  const getTranslation = (key: string, defaultValue: string) => {
+    try {
+      const keys = key.split('.');
+      let value: any = t;
+      for (const k of keys) {
+        value = value?.[k];
+      }
+      return value || defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  };
+
+  // 判断是否为中文界面
+  const isChineseUI = learningMode === "LEARN_ENGLISH"
+
+  // 通知开关状态
+  const [notificationEnabled, setNotificationEnabled] = useState(false)
+
+  // 从 localStorage 读取通知设置
+  useEffect(() => {
+    const saved = localStorage.getItem('notifications-enabled')
+    if (saved) {
+      setNotificationEnabled(saved === 'true')
+    } else {
+      // 默认根据订阅状态
+      setNotificationEnabled(notificationState.isSubscribed)
+    }
+  }, [notificationState.isSubscribed])
+
+  const settingItems: SettingItem[] = [
     { 
       id: "account", 
       icon: User, 
-      label: t.settings.account, 
+      label: getTranslation('settings.account', isChineseUI ? '账号设置' : 'Account Settings'), 
       href: "/settings/account",
     },
     { 
       id: "languages", 
       icon: Globe, 
-      label: t.settings.languages, 
+      label: getTranslation('settings.languages', isChineseUI ? '语言设置' : 'Language Settings'), 
       value: "", 
       href: "/settings/languages",
     },
     { 
       id: "appearance", 
       icon: Moon, 
-      label: t.settings.appearance, 
+      label: getTranslation('settings.appearance', isChineseUI ? '外观设置' : 'Appearance'), 
       href: "/settings/appearance",
     },
     { 
       id: "notification", 
       icon: Bell, 
-      label: t.nav.notifications, 
-      hasToggle: true, 
-      defaultToggle: true 
+      label: getTranslation('nav.notifications', isChineseUI ? '通知' : 'Notifications'), 
+      hasToggle: true,
     },
     { 
       id: "help", 
       icon: HelpCircle, 
-      label: t.settings.help, 
+      label: getTranslation('settings.help', isChineseUI ? '帮助与反馈' : 'Help & Feedback'), 
       href: "/settings/help",
     },
     { 
       id: "about", 
       icon: Info, 
-      label: t.settings.about, 
+      label: getTranslation('settings.about', isChineseUI ? '关于墨语' : 'About InkWords'), 
       href: "/settings/about",
     },
   ]
@@ -97,19 +130,53 @@ export function SettingsList({ nativeLang }: SettingsListProps) {
     return () => window.removeEventListener("storage", handleStorageChange)
   }, [])
 
-  const handleToggle = (id: string) => {
-    setToggleStates(prev => ({
-      ...prev,
-      [id]: !prev[id],
-    }))
+  // 处理通知开关
+  const handleNotificationToggle = async () => {
+    if (notificationState.isLoading) return
+
+    const newValue = !notificationEnabled
+    
+    if (newValue) {
+      // 开启通知
+      const success = await subscribe()
+      if (success) {
+        setNotificationEnabled(true)
+        localStorage.setItem('notifications-enabled', 'true')
+        // 发送测试通知
+        setTimeout(() => {
+          sendTestNotification()
+        }, 1000)
+      }
+    } else {
+      // 关闭通知
+      const success = await unsubscribe()
+      if (success) {
+        setNotificationEnabled(false)
+        localStorage.setItem('notifications-enabled', 'false')
+      }
+    }
+  }
+
+  // 获取通知开关状态显示
+  const getNotificationStatus = () => {
+    if (notificationState.isLoading) return "加载中..."
+    if (!notificationState.isSupported) return "不支持"
+    if (notificationState.permission === 'denied') return "已阻止"
+    if (notificationEnabled) return "已开启"
+    return "已关闭"
   }
 
   return (
-    <div className="bg-[#FDFBF7]/90 shadow-[0_4px_20px_rgba(43,43,43,0.08)] overflow-hidden">
+    <div className="bg-white/90 dark:bg-[#2a2a2a]/90 shadow-[0_4px_20px_rgba(43,43,43,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] overflow-hidden">
       {settingItems.map((item, index) => {
         const Icon = item.icon
         const isLast = index === settingItems.length - 1
-        const isToggleOn = toggleStates[item.id] ?? item.defaultToggle
+        
+        // 通知项特殊处理
+        const isNotification = item.id === 'notification'
+        const isToggleOn = isNotification 
+          ? notificationEnabled && notificationState.permission === 'granted'
+          : false
         
         const content = (
           <>
@@ -126,6 +193,15 @@ export function SettingsList({ nativeLang }: SettingsListProps) {
               {item.value && (
                 <span className="text-ink-gray text-xs font-sans">
                   {item.id === "languages" ? languageValue : item.value}
+                </span>
+              )}
+              
+              {isNotification && (
+                <span className={cn(
+                  "text-xs font-sans mr-2",
+                  notificationState.permission === 'denied' ? "text-red-500" : "text-ink-gray"
+                )}>
+                  {getNotificationStatus()}
                 </span>
               )}
               
@@ -173,18 +249,38 @@ export function SettingsList({ nativeLang }: SettingsListProps) {
             className={cn(
               "w-full flex items-center justify-between px-4 py-4 cursor-pointer",
               "transition-colors duration-200 hover:bg-black/5",
-              !isLast && "border-b border-ink-gray/10"
+              !isLast && "border-b border-ink-gray/10",
+              notificationState.isLoading && "opacity-50 cursor-not-allowed"
             )}
             onClick={() => {
-              if (item.hasToggle) {
-                handleToggle(item.id)
+              if (item.hasToggle && item.id === 'notification') {
+                handleNotificationToggle()
               }
             }}
+            disabled={notificationState.isLoading}
           >
             {content}
           </button>
         )
       })}
+      
+      {/* 错误提示 */}
+      {notificationState.error && (
+        <div className="px-4 py-2 bg-red-50 border-t border-red-100">
+          <p className="text-xs text-red-600 font-sans">
+            {notificationState.error}
+          </p>
+        </div>
+      )}
+      
+      {/* 权限被拒绝提示 */}
+      {notificationState.permission === 'denied' && (
+        <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-100">
+          <p className="text-xs text-yellow-700 font-sans">
+            请在浏览器设置中允许通知权限，然后刷新页面重试
+          </p>
+        </div>
+      )}
     </div>
   )
 }

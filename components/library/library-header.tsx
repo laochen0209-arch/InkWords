@@ -6,9 +6,10 @@ import { TRANSLATIONS } from "@/lib/i18n"
 
 interface LibraryHeaderProps {
   onFilterClick: () => void
+  nativeLang?: string
 }
 
-export function LibraryHeader({ onFilterClick }: LibraryHeaderProps) {
+export function LibraryHeader({ onFilterClick, nativeLang }: LibraryHeaderProps) {
   const { learningMode } = useLanguage()
   const t = TRANSLATIONS[learningMode]
 

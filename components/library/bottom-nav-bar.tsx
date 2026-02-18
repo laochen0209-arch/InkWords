@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 
-type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in"
+type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 
 interface BottomNavBarProps {
   activeTab?: TabType
@@ -18,11 +18,11 @@ export function BottomNavBar({ activeTab, onTabChange }: BottomNavBarProps) {
   const pathname = usePathname()
   const { learningMode } = useLanguage()
   const t = TRANSLATIONS[learningMode]
-  
-  const internalActiveTab = activeTab || (pathname === "/" ? "home" : pathname.startsWith("/library") ? "library" : pathname.startsWith("/practice") ? "practice" : pathname.startsWith("/study") ? "study" : pathname.startsWith("/check-in") ? "check-in" : "profile")
-  
+
+  const internalActiveTab = activeTab || (pathname === "/" || pathname.startsWith("/checkin") ? "checkin" : pathname.startsWith("/library") ? "library" : pathname.startsWith("/practice") ? "practice" : pathname.startsWith("/study") ? "study" : "profile")
+
   const items = [
-    { label: t.nav.home, icon: Home, href: "/check-in", active: pathname.startsWith("/check-in"), tab: "check-in" as TabType },
+    { label: t.nav.home, icon: Home, href: "/checkin", active: pathname.startsWith("/checkin"), tab: "checkin" as TabType },
     { label: t.nav.library, icon: BookOpen, href: "/library", active: pathname.startsWith("/library"), tab: "library" as TabType },
     { label: t.nav.practice, icon: Dumbbell, href: "/practice", active: pathname.startsWith("/practice"), tab: "practice" as TabType },
     { label: t.nav.study, icon: PenTool, href: "/study", active: pathname.startsWith("/study"), tab: "study" as TabType },

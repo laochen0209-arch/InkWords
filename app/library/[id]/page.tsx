@@ -66,5 +66,9 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  return <ArticleReader article={article} mode={mode} />
+  return (
+    <div className="min-h-screen" style={{ backgroundImage: 'url("/去文字.png")', backgroundSize: '50%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+      <ArticleReader article={article} mode={mode} />
+    </div>
+  )
 }

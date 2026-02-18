@@ -10,7 +10,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 /**
  * 获取用户信息
@@ -23,65 +24,64 @@ export async function GET(request: NextRequest) {
   console.log('[USER ME API] 收到请求')
 
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    
+    // 从查询参数获取 userId
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
     const email = request.headers.get('x-user-email')
 
-    if (!email) {
-      console.log('[USER ME API] 缺少用户邮箱')
+    if (!userId && !email) {
+      console.log('[USER ME API] 缺少用户标识')
       return NextResponse.json(
-        { error: '未授权访问' },
+        { error: '未授权访问，缺少用户标识' },
         { status: 401 }
       )
     }
 
-    console.log('[USER ME API] 查询用户邮箱:', email)
+    console.log('[USER ME API] 查询用户:', { userId, email })
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        avatar: true,
-        points: true,
-        streak: true,
-        lastLoginDate: true
-      }
-    })
+    // 查询用户信息
+    let query = supabase
+      .from('users')
+      .select('id, email, name, avatar, points, streak, last_login_date')
 
-    if (!user) {
-      console.log('[USER ME API] 用户不存在')
+    if (userId) {
+      query = query.eq('id', userId)
+    } else if (email) {
+      query = query.eq('email', email)
+    }
+
+    const { data: user, error: userError } = await query.single()
+
+    if (userError || !user) {
+      console.log('[USER ME API] 用户不存在:', userError)
       return NextResponse.json(
         { error: '用户不存在' },
         { status: 404 }
       )
     }
 
-    // 获取今日学习统计（如果不存在则创建默认记录）
+    // 获取今日学习统计
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().split('T')[0]
 
-    let todayStats = await prisma.userStudyStats.findUnique({
-      where: {
-        userId_date: {
-          userId: user.id,
-          date: today
-        }
-      }
-    })
+    const { data: todayStats, error: statsError } = await supabase
+      .from('user_study_stats')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', todayStr)
+      .single()
 
-    // 如果今日统计不存在，创建默认记录
-    if (!todayStats) {
-      console.log('[USER ME API] 今日统计不存在，创建默认记录')
-      todayStats = await prisma.userStudyStats.create({
-        data: {
-          userId: user.id,
-          date: today,
-          wordsLearned: 0,
-          sentencesLearned: 0,
-          totalLearned: 0,
-          studyTime: 0
-        }
-      })
+    // 如果今日统计不存在，返回默认值
+    const stats = todayStats || {
+      words_learned: 0,
+      sentences_learned: 0,
+      total_learned: 0,
+      study_time: 0
     }
 
     console.log('[USER ME API] 查询成功，用户ID:', user.id)
@@ -97,10 +97,10 @@ export async function GET(request: NextRequest) {
           streak: user.streak
         },
         todayStats: {
-          wordsLearned: todayStats.wordsLearned || 0,
-          sentencesLearned: todayStats.sentencesLearned || 0,
-          totalLearned: todayStats.totalLearned || 0,
-          studyTime: todayStats.studyTime || 0
+          wordsLearned: stats.words_learned || 0,
+          sentencesLearned: stats.sentences_learned || 0,
+          totalLearned: stats.total_learned || 0,
+          studyTime: stats.study_time || 0
         }
       },
       { status: 200 }

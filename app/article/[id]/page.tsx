@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronLeft, Loader2, Type, Volume2 } from "lucide-react"
 import { motion } from "framer-motion"
 import { InteractiveParagraph } from "@/components/reader/interactive-paragraph"
 import { Article } from "@/lib/types/article"
+import { logUserActivity } from "@/lib/supabase"
 
 function LoadingScreen({ text }: { text: string }) {
   return (
@@ -27,6 +28,9 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
   const [fontSize, setFontSize] = useState<"base" | "lg" | "xl">("lg")
   const [viewMode, setViewMode] = useState<"EN" | "CN" | "BOTH">("EN")
 
+  // 用于跟踪阅读完成记录是否已发送
+  const hasLoggedRead = useRef(false)
+
   useEffect(() => {
     const fetchArticle = async () => {
       try {
@@ -44,6 +48,26 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
     }
     fetchArticle()
   }, [resolvedParams.id])
+
+  // 记录文章阅读完成 - 页面停留超过 30 秒
+  useEffect(() => {
+    if (!article || hasLoggedRead.current) return
+
+    // 设置 30 秒计时器
+    const timer = setTimeout(() => {
+      logUserActivity(
+        'read_article',
+        article.id,
+        {
+          title: article.title_en || article.title_zh,
+          category: article.category || '未分类'
+        }
+      )
+      hasLoggedRead.current = true
+    }, 30000) // 30 秒
+
+    return () => clearTimeout(timer)
+  }, [article])
 
   if (loading) return <LoadingScreen text="Loading..." />
   if (!article) return <div className="p-8 text-center text-stone-600">Article not found</div>

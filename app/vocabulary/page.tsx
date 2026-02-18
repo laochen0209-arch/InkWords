@@ -1,3 +1,10 @@
+/**
+ * @file page.tsx
+ * @description 生词本页面 - 展示用户收藏的单词列表
+ * @author InkWords Team
+ * @date 2026-02-04
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -6,6 +13,9 @@ import Link from "next/link"
 import { motion, Variants } from "framer-motion"
 import { VocabularyCard } from "@/components/vocabulary/vocabulary-card"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
+import { logUserActivity } from "@/lib/supabase"
+import { useLanguage } from "@/lib/contexts/language-context"
+import { TRANSLATIONS } from "@/lib/i18n"
 
 interface WordItem {
   id: string
@@ -50,9 +60,21 @@ const itemVariants: Variants = {
   },
 }
 
+/**
+ * 生词本页面组件
+ * 
+ * 功能：
+ * - 展示用户收藏的单词列表
+ * - 支持播放发音
+ * - 标记单词为已掌握
+ * - 移除单词
+ */
 export default function VocabularyPage() {
   const [words, setWords] = useState<WordItem[]>(mockWords)
-type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in"
+  const { learningMode } = useLanguage()
+  const t = TRANSLATIONS[learningMode]
+  
+  type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 
   const totalCount = words.length
   const masteredCount = words.filter(w => w.mastered).length
@@ -61,7 +83,28 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in
   const handleRemove = (id: string) => {
     setWords(prev => prev.filter(w => w.id !== id))
   }
-  
+
+  /**
+   * 处理标记单词为已掌握
+   * @param id - 单词ID
+   */
+  const handleMaster = async (id: string) => {
+    const wordItem = words.find(w => w.id === id)
+    if (!wordItem) return
+
+    // 更新本地状态
+    setWords(prev => prev.map(w =>
+      w.id === id ? { ...w, mastered: true } : w
+    ))
+
+    // 记录单词学习活动
+    await logUserActivity(
+      'learn_word',
+      undefined,
+      { word: wordItem.word }
+    )
+  }
+
   const handlePlay = (word: string) => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(word)
@@ -83,13 +126,13 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in
             <Link 
               href="/"
               className="w-10 h-10 flex items-center justify-center text-ink-black hover:text-ink-vermilion transition-colors"
-              aria-label="返回"
+              aria-label={t.common.back}
             >
               <ArrowLeft className="w-5 h-5" strokeWidth={1.5} />
             </Link>
             
             <h1 className="flex-1 text-center font-serif text-lg text-ink-black pr-10">
-              生词本
+              {t.vocabulary.title}
             </h1>
           </div>
         </header>
@@ -98,9 +141,9 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in
           <div className="px-4 py-4">
             <div className="bg-[#FDFBF7]/80 backdrop-blur-sm px-4 py-3 border border-stone-200/30 md:bg-stone-100/50">
               <p className="text-center text-sm text-ink-gray font-serif">
-                共收藏 <span className="text-ink-black font-medium">{totalCount}</span> 词
+                {t.vocabulary.totalWords} <span className="text-ink-black font-medium">{totalCount}</span> {t.vocabulary.words}
                 <span className="mx-3 text-stone-300">·</span>
-                已掌握 <span className="text-ink-bamboo font-medium">{masteredCount}</span> 词
+                {t.vocabulary.masteredWords} <span className="text-ink-bamboo font-medium">{masteredCount}</span> {t.vocabulary.words}
               </p>
             </div>
           </div>
@@ -118,9 +161,10 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "check-in
                 layout
                 className="bg-[#FDFBF7] md:bg-[#FDFBF7]/90 backdrop-blur-sm border border-stone-200/30 shadow-[0_2px_8px_rgba(43,43,43,0.04)] p-4"
               >
-                <VocabularyCard 
+                <VocabularyCard
                   item={item}
                   onRemove={handleRemove}
+                  onMaster={handleMaster}
                 />
               </motion.div>
             ))}

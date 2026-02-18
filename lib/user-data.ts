@@ -6,8 +6,7 @@
 export interface UserData {
   nickname: string
   avatarUrl: string
-  phoneNumber: string
-  isPhoneBound: boolean
+  email: string
   userId: string
 }
 
@@ -16,8 +15,7 @@ const USER_DATA_KEY = "inkwords_user_data"
 const DEFAULT_USER_DATA: UserData = {
   nickname: "墨语学习者",
   avatarUrl: "",
-  phoneNumber: "138****8888",
-  isPhoneBound: true,
+  email: "",
   userId: "INK20240001",
 }
 

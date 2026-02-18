@@ -12,38 +12,55 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String?
-  name      String?
-  avatar    String?
-  points    Int      @default(0)
-  streak    Int      @default(0)
-  lastLoginDate DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  password             String?
+  name                 String?
+  avatar               String?
+  points               Int       @default(0)
+  streak               Int       @default(0)
+  lastLoginDate        DateTime? @map("last_login_date")
+  isPro                Boolean   @default(false) @map("is_pro")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  stripeCustomerId     String?   @map("stripe_customer_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  subscriptionType      String?   @map("subscription_type")
+  studyDailyCount      Int       @default(0) @map("study_daily_count")
+  libraryDailyCount    Int       @default(0) @map("library_daily_count")
+  lastResetDate        DateTime? @map("last_reset_date")
+  practiceTickets      Int       @default(5) @map("practice_tickets")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 
 model PracticeLog {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
   score     Int
   mode      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId])
+  @@map("practice_logs")
 }
 
 model MistakeBook {
-  id        String   @id @default(cuid())
-  userId    String
-  word       String
-  context    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  examType        String   @map("exam_type")
+  sectionType     String   @map("section_type")
+  questionContent Json   @map("question_content")
+  userAnswer      String   @map("user_answer")
+  correctAnswer   String   @map("correct_answer")
+  analysis        String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([userId])
+  @@map("mistake_books")
 }
 
 model Vocabulary {
@@ -53,183 +70,220 @@ model Vocabulary {
   pinyin      String
   exampleEn   String   @map("example_en")
   exampleZh   String   @map("example_zh")
-  difficulty   Int
+  difficulty  Int
   category    String   @default("daily")
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@index([english])
   @@index([category])
+  @@map("vocabulary")
 }
 
 model Sentence {
-  id          String   @id @default(cuid())
-  contentEn   String   @map("content_en")
-  contentZh   String   @map("content_zh")
-  pinyin      String
-  author      String
+  id        String   @id @default(cuid())
+  contentEn String   @map("content_en")
+  contentZh String   @map("content_zh")
+  pinyin    String
+  author    String
   category    String   @default("daily")
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([author])
   @@index([category])
+  @@map("sentences")
 }
 
 model Article {
-  id          String   @id @default(cuid())
-  titleEn     String   @map("title_en")
-  titleZh     String   @map("title_zh")
-  contentEn   String   @map("content_en")
-  contentZh   String   @map("content_zh")
-  category    String
-  imageUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  titleEn   String   @map("title_en")
+  titleZh   String   @map("title_zh")
+  contentEn String   @map("content_en")
+  contentZh String   @map("content_zh")
+  category  String
+  imageUrl String?   @map("image_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([category])
+  @@map("articles")
 }
 
 model News {
-  id          String   @id @default(cuid())
-  title       String
-  content     String   @db.Text
-  source      String
-  category    String
-  imageUrl   String?
-  url         String   @unique
-  publishedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  source    String
+  category  String
+  imageUrl String?   @map("image_url")
+  url       String   @unique
+  publishedAt DateTime @default(now()) @map("published_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([category, publishedAt])
+  @@map("news")
 }
 
 model CrawlerLog {
-  id          String   @id @default(cuid())
-  source      String
-  status      String
-  articleCount Int      @default(0)
-  error       String?
-  startedAt   DateTime @default(now())
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  source       String
+  status       String
+  articleCount Int       @default(0)
+  error        String?
+  startedAt    DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([source, status])
+  @@map("crawler_logs")
 }
 
 model CrawlerConfig {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  url         String
-  selector    String
-  category    String
-  enabled     Boolean  @default(true)
-  interval    Int      @default(3600)
-  lastRunAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @unique
+  url       String
+  selector String
+  category  String
+  enabled   Boolean   @default(true)
+  interval Int       @default(3600)
+  lastRunAt DateTime? @map("last_run_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("crawler_configs")
 }
 
-// 用户学习进度模型 - 记录用户在修习页面的学习情况
 model UserProgress {
-  id            String   @id @default(cuid())
-  userId        String   // 用户ID
-  category      String   // 分类：daily/finance/travel/technology
-  contentType   String   // 内容类型：word/sentence
-  contentId     String   // 学习内容ID（StudyWord或StudySentence的ID）
-  isLearned     Boolean  @default(false) // 是否已学习
-  learnedAt     DateTime? // 学习时间
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  category    String
+  contentType String   @map("content_type")
+  contentId String   @map("content_id")
+  isLearned Boolean   @default(false) @map("is_learned")
+  learnedAt DateTime? @map("learned_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([userId, category, contentType, contentId]) // 确保同一内容不会重复记录
+  @@unique([userId, category, contentType, contentId])
   @@index([userId, category, contentType])
   @@index([userId, isLearned])
+  @@map("user_progress")
 }
 
-// 用户学习统计模型 - 记录每日学习统计
 model UserStudyStats {
-  id              String   @id @default(cuid())
-  userId          String   // 用户ID
-  date            DateTime @default(now()) // 日期
-  wordsLearned    Int      @default(0) // 今日学习词汇数
-  sentencesLearned Int     @default(0) // 今日学习句子数
-  totalLearned    Int      @default(0) // 今日总学习数
-  studyTime       Int      @default(0) // 学习时长（分钟）
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  date      DateTime @default(now())
+  wordsLearned Int      @default(0) @map("words_learned")
+  sentencesLearned Int  @default(0) @map("sentences_learned")
+  totalLearned Int      @default(0) @map("total_learned")
+  studyTime Int      @default(0) @map("study_time")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([userId, date]) // 每天只有一条记录
+  @@unique([userId, date])
   @@index([userId, date])
+  @@map("user_study_stats")
 }
 
-// 用户签到记录模型
 model CheckIn {
-  id          String   @id @default(cuid())
-  userId      String   // 用户ID
-  date        DateTime @default(now()) // 签到日期
-  points      Int      @default(10) // 签到获得的积分
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  date      DateTime @default(now())
+  points    Int       @default(10)
+  createdAt DateTime @default(now()) @map("created_at")
 
-  @@unique([userId, date]) // 每天只能签到一次
+  @@unique([userId, date])
   @@index([userId, date])
+  @@map("check_ins")
 }
 
-// 邮箱验证码模型
 model VerificationCode {
-  id          String   @id @default(cuid())
-  email       String   // 邮箱地址
-  code        String   // 验证码
-  type        String   // 类型：register/reset_password
-  expiresAt   DateTime // 过期时间
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([email, type]) // 用于查询用户的验证码
-  @@index([expiresAt])   // 用于清理过期验证码
+  @@index([email, type])
+  @@index([expiresAt])
+  @@map("verification_codes")
 }
 
-// 学习词汇表 - StudyWord
 model StudyWord {
-  id          String   @id @default(cuid())
-  word        String   // 英文单词
-  meaning     String   // 中文释义
-  pronunciation String // 音标
-  example     String   // 例句
-  category    String   @default("daily") // 分类
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  word          String
+  meaning       String
+  pronunciation String
+  example       String
+  exampleZh     String?   @map("example_zh")
+  category      String   @default("daily")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@index([category])
+  @@map("study_words")
 }
 
-// 学习句子表 - StudySentence
 model StudySentence {
-  id          String   @id @default(cuid())
-  contentZh   String   @map("content_zh") // 中文内容
-  contentEn   String   @map("content_en") // 英文内容
-  pinyin      String   // 拼音
-  category    String   @default("daily") // 分类
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  zh        String
+  en        String
+  pinyin    String
+  author    String
+  category  String   @default("daily")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([author])
   @@index([category])
+  @@map("study_sentences")
 }
 
-// 考试结果表 - 存储用户考试记录和AI评语
+model MockExam {
+  id               String   @id @default(cuid())
+  examType         String   @map("exam_type")
+  sections         Json
+  questions        Json?
+  rewrittenContent String?   @map("rewritten_content")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("mock_exams")
+}
+
 model ExamResult {
-  id          String   @id @default(cuid())
-  userId      String   // 用户ID
-  examType    String   // 考试类型：IELTS/TOEFL/CET-4等
-  score       Int      // 实际得分
-  maxScore    Int      // 满分
-  details     Json     // 各部分得分和错题详情
-  aiFeedback  String?  // AI评语（主观题评语）
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  userId    String   @map("user_id")
+  examType String   @map("exam_type")
+  score    Int
+  maxScore Int @map("max_score")
+  details Json
+  aiFeedback String? @map("ai_feedback")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([examType])
-  @@index([createdAt])
+  @@map("exam_results")
+}
+
+model ExamAttempt {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  examId          String   @map("exam_id")
+  pTotalQuestions Int @map("p_total_questions")
+  pCorrectCount   Int @map("p_correct_count")
+  score           Int @map("score")
+  completedAt     DateTime @map("completed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([examId])
+  @@map("exam_attempts")
 }

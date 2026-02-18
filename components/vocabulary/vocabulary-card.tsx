@@ -1,9 +1,16 @@
+/**
+ * @file vocabulary-card.tsx
+ * @description 单词卡片组件 - 展示单词信息并提供操作按钮
+ * @author InkWords Team
+ * @date 2026-02-04
+ */
+
 "use client"
 
-import { Volume2, X } from "lucide-react"
+import { Volume2, X, Check } from "lucide-react"
 import { motion } from "framer-motion"
 
-interface WordItem {
+export interface WordItem {
   id: string
   word: string
   phonetic: string
@@ -14,9 +21,10 @@ interface WordItem {
 interface VocabularyCardProps {
   item: WordItem
   onRemove: (id: string) => void
+  onMaster?: (id: string) => void
 }
 
-export function VocabularyCard({ item, onRemove }: VocabularyCardProps) {
+export function VocabularyCard({ item, onRemove, onMaster }: VocabularyCardProps) {
   const handlePlay = () => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(item.word)
@@ -44,7 +52,7 @@ export function VocabularyCard({ item, onRemove }: VocabularyCardProps) {
             </span>
           )}
         </div>
-        
+
         <div className="flex flex-col gap-2">
           <button
             type="button"
@@ -54,7 +62,19 @@ export function VocabularyCard({ item, onRemove }: VocabularyCardProps) {
           >
             <Volume2 className="w-4 h-4" strokeWidth={1.5} />
           </button>
-          
+
+          {/* 标记为已掌握按钮 - 仅当单词未掌握时显示 */}
+          {!item.mastered && onMaster && (
+            <button
+              type="button"
+              onClick={() => onMaster(item.id)}
+              className="w-9 h-9 flex items-center justify-center text-ink-gray hover:text-white hover:bg-ink-bamboo transition-colors duration-150 cursor-pointer"
+              aria-label={`标记 ${item.word} 为已掌握`}
+            >
+              <Check className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onRemove(item.id)}

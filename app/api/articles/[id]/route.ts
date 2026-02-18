@@ -24,9 +24,9 @@ export async function GET(
   const { id } = await params;
 
   try {
-    // 先从 Article 表查询
+    // 先从 articles 表查询 (注意：表名使用小写)
     const { data: articleData, error: articleError } = await supabase
-      .from("Article")
+      .from("articles")
       .select("*")
       .eq("id", id)
       .single();

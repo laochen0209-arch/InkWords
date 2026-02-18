@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, ChevronDown, MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getLanguageSettings, NativeLang } from "@/lib/language-utils"
+import { openTidioChat } from "@/components/tidio-provider"
 
 interface FAQItem {
   id: string
@@ -118,7 +119,7 @@ export default function HelpPage({ nativeLang: propNativeLang }: HelpPageProps) 
   }
 
   const handleContactSupport = () => {
-    alert(t.contactSupportDesc)
+    openTidioChat()
   }
 
   return (

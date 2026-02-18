@@ -1,11 +1,9 @@
 "use client"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 interface TopNavProps {
   points?: number
-  userName?: string
-  userAvatar?: string
 }
 
 // 获取农历日期（简化版，实际可使用专门的库）
@@ -25,9 +23,20 @@ function getLunarDate(): string {
   return `${lunarMonths[month]}月${lunarDays[Math.min(day, 29)]}`
 }
 
-export function TopNav({ points = 320, userName = "墨客", userAvatar }: TopNavProps) {
+export function TopNav({ points = 320 }: TopNavProps) {
   const lunarDate = getLunarDate()
-  
+  const { user, isLoading } = useAuth()
+
+  // 真实的 VIP 判断逻辑
+  const isVip = user && ['yearly', 'monthly', 'active'].includes(user.subscription_status || '')
+
+  // 获取真实显示名称
+  const displayName = user?.name || user?.email?.split('@')[0] || '墨语学习者'
+
+  // 获取真实头像
+  const displayAvatar = user?.avatar 
+    || `https://api.dicebear.com/7.x/notionists/svg?seed=${user?.id || 'guest'}`
+
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-border/50">
       <div className="flex items-center justify-between px-5 py-3">
@@ -56,7 +65,7 @@ export function TopNav({ points = 320, userName = "墨客", userAvatar }: TopNav
           <span className="text-sm text-ink-gray font-serif">{lunarDate}</span>
         </div>
         
-        {/* 右侧：积分 + 头像 */}
+        {/* 右侧：积分 + 用户信息 */}
         <div className="flex items-center gap-3">
           {/* 积分胶囊 */}
           <div className="flex items-center gap-1.5 px-3 py-1 bg-ink-paper border border-border rounded-full">
@@ -68,13 +77,40 @@ export function TopNav({ points = 320, userName = "墨客", userAvatar }: TopNav
             <span className="text-xs text-ink-gray">墨点</span>
           </div>
           
-          {/* 用户头像 */}
-          <Avatar className="w-8 h-8 border border-border">
-            <AvatarImage src={userAvatar || "/placeholder.svg"} alt={userName} />
-            <AvatarFallback className="bg-ink-paper text-ink-black font-serif text-sm">
-              {userName.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
+          {/* 【修改此处】使用真实数据的用户栏 */}
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+            </div>
+          ) : user ? (
+            <div className="flex items-center gap-3">
+              {/* 用户名称和VIP标识 */}
+              <div className="flex flex-col items-end hidden sm:flex">
+                <span className="font-bold text-sm text-ink-black flex items-center gap-1">
+                  {displayName}
+                  {isVip && (
+                    <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                      {user.subscription_status === 'yearly' ? '👑 VIP' : '⭐ PRO'}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] text-ink-gray">ID: {user.id.slice(0, 6)}</span>
+              </div>
+              
+              {/* 用户头像 */}
+              <div className="relative w-9 h-9">
+                <img
+                  src={displayAvatar}
+                  alt={displayName}
+                  className="w-full h-full rounded-full object-cover border-2 border-white shadow-md"
+                />
+                {/* 在线状态绿点 */}
+                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-sm text-ink-gray">未登录</span>
+          )}
         </div>
       </div>
     </header>

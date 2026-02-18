@@ -1,7 +1,7 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { BookOpen, Tag } from "lucide-react"
+import { BookOpen, Tag, Loader2 } from "lucide-react"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import Link from "next/link"
@@ -19,19 +19,39 @@ interface LibraryListProps {
   articles: Article[]
   nativeLang: string
   targetLang: string
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
+  category?: string
+  readStatus?: string
 }
 
-export function LibraryList({ articles }: LibraryListProps) {
-  const [activeTab, setActiveTab] = useState<string>("all")
+export function LibraryList({ 
+  articles, 
+  loading, 
+  error, 
+  onRetry,
+  category = 'all',
+  readStatus = 'all'
+}: LibraryListProps) {
   const { learningMode } = useLanguage()
   const t = TRANSLATIONS[learningMode]
   
+  // 【修复】使用传入的 category 作为 activeTab
+  const [activeTab, setActiveTab] = useState<string>(category)
+  
+  // 当外部 category 变化时同步
+  useEffect(() => {
+    setActiveTab(category)
+  }, [category])
+  
   const tabs = [
     { id: "all", label: "全部" },
-    { id: "news", label: t.library.news },
-    { id: "classics", label: t.library.classics }
+    { id: "news", label: t.library?.news || "News" },
+    { id: "classics", label: t.library?.classics || "Classics" }
   ]
   
+  // 【修复】根据传入的 articles 和 activeTab 过滤
   const filteredArticles = articles.filter(article => {
     const match = activeTab === "all" || 
       article.category.toLowerCase() === activeTab.toLowerCase() ||
@@ -59,8 +79,36 @@ export function LibraryList({ articles }: LibraryListProps) {
     }
   }
 
+  // 加载状态
+  if (loading) {
+    return (
+      <div className="px-4 py-20 max-w-2xl mx-auto flex flex-col items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#C23E32] animate-spin mb-4" />
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    )
+  }
+
+  // 错误状态
+  if (error) {
+    return (
+      <div className="px-4 py-20 max-w-2xl mx-auto text-center">
+        <p className="text-red-500 mb-4">{error}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="px-4 py-2 bg-[#C23E32] text-white rounded-lg hover:bg-[#A8352B] transition-colors"
+          >
+            重试
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
+      {/* 【修复】Tab 切换按钮 - 同步 URL 的 category */}
       <div className="flex items-center justify-center gap-2 mb-6 bg-white/60 backdrop-blur-sm rounded-2xl p-1.5 shadow-inner">
         {tabs.map((tab) => (
           <button

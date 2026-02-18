@@ -1,6 +1,12 @@
 /**
  * 智能文本转语音 Hook (Smart Text-to-Speech)
  * 使用 Web Speech API 实现语音播放功能
+ * 
+ * @file use-tts.ts
+ * @description 提供文本转语音功能，支持中英文播放
+ * @author InkWords Team
+ * @date 2026-02-08
+ * @version 2.0.0 - 修复语音加载和播放问题
  */
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -32,12 +38,51 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentText, setCurrentText] = useState(initialText || "")
   const [currentLearningMode, setCurrentLearningMode] = useState(initialLearningMode || "LEARN_CHINESE")
+  const [voicesLoaded, setVoicesLoaded] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const pendingTextRef = useRef<string | null>(null)
   
   /**
    * 检查浏览器是否支持语音合成
    */
   const isSupported = typeof window !== "undefined" && "speechSynthesis" in window
+  
+  /**
+   * 【关键修复】预加载语音列表
+   * Chrome 浏览器需要等待 voiceschanged 事件
+   */
+  useEffect(() => {
+    if (!isSupported) return
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        setVoicesLoaded(true)
+        console.log('[TTS] 语音列表已加载:', voices.length, '个语音')
+        
+        // 如果有待播放的文本，立即播放
+        if (pendingTextRef.current) {
+          const text = pendingTextRef.current
+          pendingTextRef.current = null
+          setTimeout(() => speak(text), 100)
+        }
+      }
+    }
+
+    // 立即尝试加载
+    loadVoices()
+
+    // 监听语音列表变化
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices
+    }
+
+    return () => {
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = null
+      }
+    }
+  }, [isSupported])
   
   /**
    * 获取最佳语音
@@ -47,7 +92,10 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     if (!isSupported) return null
     
     const voices = window.speechSynthesis.getVoices()
-    if (voices.length === 0) return null
+    if (voices.length === 0) {
+      console.warn('[TTS] 语音列表为空，等待加载...')
+      return null
+    }
     
     // 中文：优先 Google 或 Microsoft 的 zh-CN 声音
     if (lang === "zh-CN") {
@@ -98,17 +146,29 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
    */
   const speak = useCallback((text: string) => {
     if (!isSupported) {
-      console.warn("Speech synthesis not supported")
+      console.warn("[TTS] Speech synthesis not supported")
       return
     }
     
     if (!text || text.trim() === "") {
-      console.warn("Empty text provided")
+      console.warn("[TTS] Empty text provided")
       return
     }
     
-    // 停止之前的播放（防重叠）
+    // 【关键修复】如果语音列表还没加载，先保存文本等待加载完成
+    if (!voicesLoaded) {
+      console.log('[TTS] 语音列表未加载，等待中...')
+      pendingTextRef.current = text
+      return
+    }
+    
+    // 【关键修复】停止之前的播放（防重叠）
     window.speechSynthesis.cancel()
+    
+    // 【关键修复】Chrome 浏览器需要 resume
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+    }
     
     // 创建新的语音实例
     const utterance = new SpeechSynthesisUtterance(text)
@@ -119,34 +179,52 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     const bestVoice = getBestVoice(langCode)
     if (bestVoice) {
       utterance.voice = bestVoice
+      console.log('[TTS] 使用语音:', bestVoice.name)
+    } else {
+      console.warn('[TTS] 未找到合适的语音，使用默认语音')
     }
     
     // 设置语速和音调（优化体验）
     utterance.rate = 0.9  // 稍慢一点，更清晰
     utterance.pitch = 1.0  // 正常音调
+    utterance.volume = 1.0  // 最大音量
     
     // 保存引用以便取消
     utteranceRef.current = utterance
     
     // 事件监听
     utterance.onstart = () => {
+      console.log('[TTS] 开始播放:', text.substring(0, 30) + '...')
       setIsPlaying(true)
     }
     
     utterance.onend = () => {
+      console.log('[TTS] 播放结束')
       setIsPlaying(false)
       utteranceRef.current = null
     }
     
     utterance.onerror = (event) => {
-      console.error("Speech synthesis error:", event)
+      // 【关键修复】处理 interrupted 错误
+      if (event.error === 'interrupted') {
+        console.log('[TTS] 播放被中断（正常行为）')
+      } else if (event.error === 'canceled') {
+        console.log('[TTS] 播放被取消（正常行为）')
+      } else {
+        console.error("[TTS] Speech synthesis error:", event.error, event)
+      }
       setIsPlaying(false)
       utteranceRef.current = null
     }
     
-    // 开始播放
-    window.speechSynthesis.speak(utterance)
-  }, [isSupported, currentLearningMode, getBestVoice, getLanguageCode])
+    // 【关键修复】确保在用户交互上下文中执行
+    try {
+      window.speechSynthesis.speak(utterance)
+    } catch (error) {
+      console.error('[TTS] 播放失败:', error)
+      setIsPlaying(false)
+    }
+  }, [isSupported, currentLearningMode, getBestVoice, getLanguageCode, voicesLoaded])
   
   /**
    * 停止播放
@@ -157,6 +235,7 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     window.speechSynthesis.cancel()
     setIsPlaying(false)
     utteranceRef.current = null
+    pendingTextRef.current = null
   }, [isSupported])
   
   /**

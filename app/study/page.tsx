@@ -7,15 +7,41 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+/**
+ * @fileoverview 修习页面 - 智能学习系统
+ * @description 提供词汇和句子的学习功能，支持下划线填空模式
+ * @version 5.1.0 - 添加 URL 状态持久化
+ */
+
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { ArrowLeft, Volume2, X, Check, RotateCcw, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
+import { UpgradeModal } from "@/components/upgrade/upgrade-modal"
 import confetti from "canvas-confetti"
 import { pinyin } from "pinyin-pro"
+import { recordStudy } from "@/lib/user-stats"
+import { logger } from "@/lib/logger"
+
+// LocalStorage keys
+const STORAGE_KEYS = {
+  STUDY_CATEGORY: 'inkwords_study_category',
+  STUDY_MODE: 'inkwords_study_mode',
+  STUDY_METHOD: 'inkwords_study_method'
+}
+
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') return defaultValue
+  try {
+    const item = localStorage.getItem(key)
+    return item ? JSON.parse(item) : defaultValue
+  } catch {
+    return defaultValue
+  }
+}
 
 // 学习内容的类型定义
 interface WordItem {
@@ -39,33 +65,70 @@ interface SentenceItem {
 
 
 
-export default function StudyPage() {
+// 页面内容组件（需要 Suspense 包裹）
+function StudyPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { learningMode, targetLang } = useLanguage()
+  const t = TRANSLATIONS[learningMode]
+
+  // 从 URL 或 LocalStorage 获取初始状态
+  const getInitialState = useCallback(() => {
+    // 优先级：URL > LocalStorage > 默认值
+    const urlCategory = searchParams.get('category')
+    const urlMode = searchParams.get('mode') as "word" | "sentence" | null
+    const urlMethod = searchParams.get('method') as "A" | "B" | null
+
+    return {
+      category: urlCategory || loadFromStorage(STORAGE_KEYS.STUDY_CATEGORY, 'Lifestyle'),
+      mode: urlMode || loadFromStorage(STORAGE_KEYS.STUDY_MODE, 'word'),
+      method: urlMethod || loadFromStorage(STORAGE_KEYS.STUDY_METHOD, 'B')
+    }
+  }, [searchParams])
+
+  const initialState = getInitialState()
+
   // 状态管理
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [mode, setMode] = useState<"A" | "B">('B')
+  const [mode, setMode] = useState<"A" | "B">(initialState.method)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [practiceMode, setPracticeMode] = useState<"word" | "sentence">('word')
+  const [practiceMode, setPracticeMode] = useState<"word" | "sentence">(initialState.mode)
   const [showHint, setShowHint] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState('Lifestyle')
+  const [selectedCategory, setSelectedCategory] = useState(initialState.category)
   const [wordInputs, setWordInputs] = useState<string[]>([])
   const [sentenceInputs, setSentenceInputs] = useState<string[]>([])
   const [feedbackStatus, setFeedbackStatus] = useState<'idle' | 'correct' | 'wrong'>('idle')
-  
+  // 【新增】记录每个输入框的错误状态
+  const [inputErrors, setInputErrors] = useState<boolean[]>([])
+  // 【新增】抖动动画状态
+  const [isShaking, setIsShaking] = useState(false)
+
   // 拼音相关状态
   const [wordPinyinArray, setWordPinyinArray] = useState<string[]>([])
   const [wordPinyinFull, setWordPinyinFull] = useState<string>('')
   const [sentencePinyinArray, setSentencePinyinArray] = useState<string[]>([])
   const [sentencePinyinFull, setSentencePinyinFull] = useState<string>('')
-  
+
   // 数据状态
   const [words, setWords] = useState<WordItem[]>([])
   const [sentences, setSentences] = useState<SentenceItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  const router = useRouter()
-  const { learningMode, targetLang } = useLanguage()
-  const t = TRANSLATIONS[learningMode]
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
+  // 更新 URL 参数（不刷新页面）
+  const updateUrlParams = useCallback((updates: { category?: string, mode?: string, method?: string }) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (updates.category) params.set('category', updates.category)
+    if (updates.mode) params.set('mode', updates.mode)
+    if (updates.method) params.set('method', updates.method)
+    window.history.replaceState(null, '', `/study?${params.toString()}`)
+  }, [searchParams])
+
+  // 保存状态到 LocalStorage
+  const saveToStorage = useCallback((key: string, value: any) => {
+    localStorage.setItem(key, JSON.stringify(value))
+  }, [])
   
   // 输入框引用
   const wordInputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -94,7 +157,7 @@ export default function StudyPage() {
           const user = JSON.parse(userStr)
           return user.id || user.userId || null
         } catch (e) {
-          console.error('解析用户数据失败:', e)
+          logger.error('解析用户数据失败:', e)
         }
       }
       // 兼容旧版本直接存储的 userId
@@ -125,34 +188,45 @@ export default function StudyPage() {
       const userId = getUserId()
       const dbCategory = categoryLabel
 
-      console.log('🔍 获取学习数据:', { category: categoryLabel, dbCategory, userId })
+      logger.log('获取学习数据:', { category: categoryLabel, dbCategory, userId })
       
       const response = await fetch(`/api/study/data?category=${encodeURIComponent(dbCategory)}`, {
         headers: userId ? { 'x-user-id': userId } : {},
         signal,
       })
-      
+
+      const data = await response.json()
+      logger.log('获取数据结果:', {
+        status: response.status,
+        wordsCount: data.words?.length,
+        sentencesCount: data.sentences?.length,
+        code: data.code,
+        error: data.error,
+      })
+
+      // 检查是否达到限额
+      if (response.status === 403 && data.code === 'LIMIT_REACHED') {
+        setShowUpgradeModal(true)
+        setWords([])
+        setSentences([])
+        return
+      }
+
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`获取数据失败: ${response.status} ${errorText}`)
       }
-      
-      const data = await response.json()
-      console.log('✅ 获取数据成功:', { 
-        wordsCount: data.words?.length, 
-        sentencesCount: data.sentences?.length,
-      })
-      
+
       setWords(data.words || [])
       setSentences(data.sentences || [])
       
     } catch (err) {
       // 忽略请求取消错误
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log('🚫 请求被取消')
+        logger.log('请求被取消')
         return
       }
-      console.error('❌ 获取数据失败:', err)
+      logger.error('获取数据失败:', err)
       setError('获取学习数据失败，请稍后重试')
     } finally {
       setIsLoading(false)
@@ -199,7 +273,7 @@ export default function StudyPage() {
       setWordInputs(Array(pinyinArray.length).fill(''))
       wordInputRefs.current = Array(pinyinArray.length).fill(null)
       
-      console.log('📝 拼音转换:', { chinese: chineseText, pinyinArray, pinyinFull })
+      logger.log('拼音转换:', { chinese: chineseText, pinyinArray, pinyinFull })
       
       // ✅ 修复：使用 Ref 聚焦第一个输入框 (兼容中英文模式)
       const timer = setTimeout(() => {
@@ -247,7 +321,7 @@ export default function StudyPage() {
       setSentenceInputs(Array(pinyinArray.length).fill(''))
       sentenceInputRefs.current = Array(pinyinArray.length).fill(null)
       
-      console.log('📝 句子拼音转换:', { chinese: chineseText, pinyinArray, pinyinFull })
+      logger.log('句子拼音转换:', { chinese: chineseText, pinyinArray, pinyinFull })
       
       // ✅ 修复：使用 Ref 聚焦句子模式的第一个框
       const timer = setTimeout(() => {
@@ -261,6 +335,7 @@ export default function StudyPage() {
       const tokens = currentSentence.en?.split(/\s+/).filter(Boolean) || []
       if (tokens.length > 0) {
         setSentenceInputs(Array(tokens.length).fill(''))
+        setInputErrors(Array(tokens.length).fill(false)) // 【新增】重置错误状态
         sentenceInputRefs.current = Array(tokens.length).fill(null)
         setSentencePinyinArray([])
         setSentencePinyinFull('')
@@ -283,30 +358,60 @@ export default function StudyPage() {
     setWordInputs(newInputs)
   }
 
-  // 处理句子输入
+  // 【优化】处理句子输入 - 添加实时错误检测
   const handleSentenceInputChange = (index: number, value: string) => {
     const newInputs = [...sentenceInputs]
     newInputs[index] = value
     setSentenceInputs(newInputs)
+    
+    // 【新增】实时错误检测
+    if (!isLearnChinese && practiceMode === 'sentence') {
+      const sentence = currentItem as SentenceItem
+      const tokens = sentence?.en?.split(/\s+/).filter(Boolean) || []
+      const correctWord = tokens[index]?.toLowerCase() || ''
+      const userWord = value.toLowerCase().trim()
+      
+      // 只有当用户输入完成一个单词时才检测（输入长度 >= 正确答案长度）
+      if (userWord.length >= correctWord.length && correctWord.length > 0) {
+        const newErrors = [...inputErrors]
+        newErrors[index] = userWord !== correctWord
+        setInputErrors(newErrors)
+      } else if (userWord.length === 0) {
+        // 清空输入时重置错误状态
+        const newErrors = [...inputErrors]
+        newErrors[index] = false
+        setInputErrors(newErrors)
+      }
+    }
   }
 
   // 处理下一个
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     // 🔒 如果正在跳转中，直接无视后续请求
     if (isNavigating.current) return
-    
+
+    // 记录学习活动（只有在回答正确后才记录）
+    if (feedbackStatus === 'correct') {
+      try {
+        await recordStudy(1)
+        logger.log('学习记录已更新')
+      } catch (error) {
+        logger.error('更新学习记录失败:', error)
+      }
+    }
+
     if (currentIndex < totalItems - 1) {
       isNavigating.current = true // 🔒 上锁
       setCurrentIndex(prev => prev + 1)
       setFeedbackStatus('idle')
       setShowHint(false)
-      
+
       // 🔓 500ms 后解锁
       setTimeout(() => {
         isNavigating.current = false
       }, 500)
     }
-  }, [currentIndex, totalItems])
+  }, [currentIndex, totalItems, feedbackStatus])
 
   // 检查答案
   const handleCheck = useCallback(() => {
@@ -362,12 +467,28 @@ export default function StudyPage() {
 
     if (normalizedUser === normalizedCorrect) {
         setFeedbackStatus('correct')
+        setIsShaking(false)
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
         
         // 不再自动跳转，等待用户按回车或空格键
         // 用户可以在查看正确答案后，按回车或空格键继续
       } else {
         setFeedbackStatus('wrong')
+        
+        // 【新增】触发抖动动画
+        setIsShaking(true)
+        setTimeout(() => setIsShaking(false), 500)
+        
+        // 【新增】更新每个单词的错误状态（仅学英文模式）
+        if (!isLearnChinese && practiceMode === 'sentence') {
+          const sentence = currentItem as SentenceItem
+          const tokens = sentence?.en?.split(/\s+/).filter(Boolean) || []
+          const newErrors = tokens.map((token, idx) => {
+            const userWord = sentenceInputs[idx]?.toLowerCase().trim() || ''
+            return userWord !== token.toLowerCase()
+          })
+          setInputErrors(newErrors)
+        }
       }
   }, [currentItem, practiceMode, isLearnChinese, wordPinyinArray, wordInputs, sentencePinyinArray, sentenceInputs, handleNext])
 
@@ -380,26 +501,38 @@ export default function StudyPage() {
     }
   }
 
-  // 切换分类
-  const handleCategoryChange = (categoryLabel: string) => {
-    console.log('🔄 切换分类:', categoryLabel)
+  // 切换分类（带状态持久化）
+  const handleCategoryChange = useCallback((categoryLabel: string) => {
+    logger.log('切换分类:', categoryLabel)
     setSelectedCategory(categoryLabel)
-  }
+    // 保存到 LocalStorage
+    saveToStorage(STORAGE_KEYS.STUDY_CATEGORY, categoryLabel)
+    // 更新 URL
+    updateUrlParams({ category: categoryLabel })
+  }, [saveToStorage, updateUrlParams])
 
-  // 切换练习模式
-  const handlePracticeModeChange = (newMode: "word" | "sentence") => {
+  // 切换练习模式（带状态持久化）
+  const handlePracticeModeChange = useCallback((newMode: "word" | "sentence") => {
     setPracticeMode(newMode)
     setCurrentIndex(0)
     setFeedbackStatus('idle')
     setShowHint(false)
-  }
+    // 保存到 LocalStorage
+    saveToStorage(STORAGE_KEYS.STUDY_MODE, newMode)
+    // 更新 URL
+    updateUrlParams({ mode: newMode })
+  }, [saveToStorage, updateUrlParams])
 
-  // 切换学习模式
-  const handleModeChange = (newMode: "A" | "B") => {
+  // 切换学习模式（带状态持久化）
+  const handleModeChange = useCallback((newMode: "A" | "B") => {
     setMode(newMode)
     setFeedbackStatus('idle')
     setShowHint(false)
-  }
+    // 保存到 LocalStorage
+    saveToStorage(STORAGE_KEYS.STUDY_METHOD, newMode)
+    // 更新 URL
+    updateUrlParams({ method: newMode })
+  }, [saveToStorage, updateUrlParams])
 
   // 全局键盘监听 - Enter/空格键控制检查/下一题
   useEffect(() => {
@@ -425,38 +558,172 @@ export default function StudyPage() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [mode, currentItem, feedbackStatus, handleNext, handleCheck])
 
-  // 播放语音
+  // 【关键修复】播放语音 - 添加预加载和错误处理
   const handlePlay = () => {
     if (!currentItem) return
-    setIsPlaying(true)
     
-    if ('speechSynthesis' in window) {
-      let text: string
+    if (!('speechSynthesis' in window)) {
+      logger.warn('浏览器不支持语音合成')
+      return
+    }
+    
+    let text: string
+    
+    if (practiceMode === "word") {
+      const word = currentItem as WordItem
+      text = isLearnChinese ? word.meaning : word.word
+    } else {
+      const sentence = currentItem as SentenceItem
+      text = isLearnChinese ? sentence.zh : sentence.en
+    }
+    
+    if (!text || text.trim() === '') {
+      logger.warn('空文本，跳过播放')
+      return
+    }
+    
+    try {
+      // 停止之前的播放
+      window.speechSynthesis.cancel()
       
-      if (practiceMode === "word") {
-        const word = currentItem as WordItem
-        text = isLearnChinese ? word.meaning : word.word
-      } else {
-        const sentence = currentItem as SentenceItem
-        text = isLearnChinese ? sentence.zh : sentence.en
+      // Chrome 浏览器需要 resume
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume()
       }
       
       const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = isLearnChinese ? 'zh-CN' : 'en-US'
-      utterance.onend = () => setIsPlaying(false)
-      speechSynthesis.speak(utterance)
+      const langCode = isLearnChinese ? 'zh-CN' : 'en-US'
+      utterance.lang = langCode
+      
+      // 【关键修复】获取最佳语音
+      const voices = window.speechSynthesis.getVoices()
+      const bestVoice = voices.find(v => v.lang === langCode)
+      if (bestVoice) {
+        utterance.voice = bestVoice
+      }
+      
+      utterance.rate = 0.9
+      utterance.pitch = 1.0
+      utterance.volume = 1.0
+      
+      // 事件监听
+      utterance.onstart = () => {
+        logger.log('开始播放:', text.substring(0, 30))
+        setIsPlaying(true)
+      }
+      
+      utterance.onend = () => {
+        logger.log('播放结束')
+        setIsPlaying(false)
+      }
+      
+      utterance.onerror = (event) => {
+        // 【关键修复】处理 interrupted 错误
+        if (event.error === 'interrupted' || event.error === 'canceled') {
+          logger.log('播放被中断（正常行为）')
+        } else {
+          logger.error('播放错误:', event.error)
+        }
+        setIsPlaying(false)
+      }
+      
+      // 【关键修复】使用 setTimeout 确保在用户交互上下文中执行
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.speak(utterance)
+        } catch (error) {
+          logger.error('播放失败:', error)
+          setIsPlaying(false)
+        }
+      }, 10)
+    } catch (error) {
+      logger.error('播放失败:', error)
+      setIsPlaying(false)
     }
-    
-    setTimeout(() => setIsPlaying(false), 1000)
   }
 
-  // 加载状态
+  // 加载状态 - 优化版本，显示 AI 生成提示和骨架屏
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-0 bg-ink-paper ink-landscape-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#C23E32] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-ink-gray">{isLearnChinese ? "Loading..." : "加载中..."}</p>
+      <div className="fixed inset-0 z-0 bg-ink-paper ink-landscape-bg">
+        {/* 背景装饰 */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-[#C23E32]/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-40 right-10 w-40 h-40 bg-[#C23E32]/10 rounded-full blur-3xl" />
+        </div>
+        
+        <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
+          {/* AI 生成提示 */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm mb-6">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C23E32] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#C23E32]"></span>
+              </span>
+              <span className="text-sm font-medium text-[#C23E32]">
+                {isLearnChinese ? "⚡️ AI is generating your practice..." : "⚡️ AI 正在生成专属练习..."}
+              </span>
+            </div>
+          </div>
+
+          {/* 骨架屏卡片 */}
+          <div className="w-full max-w-2xl mx-auto">
+            {/* 分类选择器骨架 */}
+            <div className="flex justify-center gap-3 mb-6">
+              <div className="w-24 h-10 bg-white/60 rounded-full animate-pulse" />
+              <div className="w-24 h-10 bg-white/60 rounded-full animate-pulse" />
+            </div>
+
+            {/* 进度条骨架 */}
+            <div className="w-full h-2 bg-white/40 rounded-full mb-8 overflow-hidden">
+              <div className="h-full bg-[#C23E32]/30 rounded-full animate-pulse w-1/3" />
+            </div>
+
+            {/* 主要内容卡片骨架 */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/50">
+              {/* 模式切换骨架 */}
+              <div className="flex justify-center gap-2 mb-8">
+                <div className="w-20 h-8 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="w-20 h-8 bg-gray-100 rounded-lg animate-pulse" />
+              </div>
+
+              {/* 题目内容骨架 */}
+              <div className="space-y-6">
+                {/* 提示文字骨架 */}
+                <div className="text-center space-y-2">
+                  <div className="w-48 h-4 bg-gray-100 rounded mx-auto animate-pulse" />
+                  <div className="w-32 h-3 bg-gray-100 rounded mx-auto animate-pulse" />
+                </div>
+
+                {/* 主要内容骨架 */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-8 min-h-[200px] flex items-center justify-center">
+                  <div className="space-y-4 w-full max-w-md">
+                    <div className="w-full h-12 bg-white rounded-xl animate-pulse" />
+                    <div className="flex gap-2 justify-center">
+                      <div className="w-12 h-12 bg-white rounded-lg animate-pulse" />
+                      <div className="w-12 h-12 bg-white rounded-lg animate-pulse" />
+                      <div className="w-12 h-12 bg-white rounded-lg animate-pulse" />
+                      <div className="w-12 h-12 bg-white rounded-lg animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 按钮骨架 */}
+                <div className="flex justify-center gap-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full animate-pulse" />
+                  <div className="w-32 h-12 bg-[#C23E32]/20 rounded-full animate-pulse" />
+                  <div className="w-12 h-12 bg-gray-100 rounded-full animate-pulse" />
+                </div>
+              </div>
+            </div>
+
+            {/* 底部提示 */}
+            <p className="text-center text-sm text-ink-gray/60 mt-6">
+              {isLearnChinese 
+                ? "Preparing personalized content for you..." 
+                : "正在为您准备个性化学习内容..."}
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -712,8 +979,8 @@ export default function StudyPage() {
                             </div>
                           )}
                           
-                          {/* Word Details */}
-                          {(feedbackStatus === 'correct' || feedbackStatus === 'wrong' || showHint) && (
+                          {/* Word Details - 只在回答正确或点击提示时显示 */}
+                          {(feedbackStatus === 'correct' || showHint) && (
                             <div className="mt-8 p-6 bg-stone-50 rounded-xl border border-stone-200">
                               <h4 className="text-sm font-bold text-stone-500 uppercase tracking-wide mb-4">
                                 Word Details
@@ -833,8 +1100,8 @@ export default function StudyPage() {
                             </div>
                           )}
                           
-                          {/* Word Details */}
-                          {(feedbackStatus === 'correct' || feedbackStatus === 'wrong' || showHint) && (
+                          {/* Word Details - 只在回答正确或点击提示时显示 */}
+                          {(feedbackStatus === 'correct' || showHint) && (
                             <div className="mt-8 p-6 bg-stone-50 rounded-xl border border-stone-200">
                               <h4 className="text-sm font-bold text-stone-500 uppercase tracking-wide mb-4">
                                 {isLearnChinese ? "Word Details" : "单词详情"}
@@ -1008,8 +1275,8 @@ export default function StudyPage() {
                             </div>
                           )}
                           
-                          {/* Sentence Details */}
-                          {(feedbackStatus === 'correct' || feedbackStatus === 'wrong' || showHint) && (
+                          {/* Sentence Details - 只在回答正确或点击提示时显示 */}
+                          {(feedbackStatus === 'correct' || showHint) && (
                             <div className="mt-8 p-6 bg-stone-50 rounded-xl border border-stone-200">
                               <h4 className="text-sm font-bold text-stone-500 uppercase tracking-wide mb-4">
                                 Sentence Details
@@ -1044,57 +1311,69 @@ export default function StudyPage() {
                       {(mode === "A" || mode === "B") && !isLearnChinese && currentSentence && sentenceInputs.length > 0 && (
                         <div className="mt-8">
                           <div className="flex items-center justify-center gap-6 mb-6 flex-wrap">
-                            <div className="flex items-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-3 flex-wrap justify-center max-w-full">
                               {sentenceInputs.map((value, index) => {
                                 const sentence = currentItem as SentenceItem
                                 const tokens = sentence?.en?.split(/\s+/).filter(Boolean) || []
-                                const hintText = tokens?.[index] || ''
+                                const correctWord = tokens?.[index] || ''
+                                const hasError = inputErrors[index] && value.length > 0
+                                const isCorrect = feedbackStatus === 'correct'
+                                
+                                // 【优化】根据单词长度精确计算宽度，每个字符约 14px，加上 padding
+                                const charWidth = 14
+                                const padding = 16
+                                const minWidth = Math.max(50, correctWord.length * charWidth + padding)
                                 
                                 return (
-                                  <input
-                                    key={index}
-                                    ref={el => { sentenceInputRefs.current[index] = el }}
-                                    type="text"
-                                    value={showHint ? hintText : value}
-                                    onChange={(e) => handleSentenceInputChange(index, e.target.value)}
-                                    onKeyDown={(e) => {
-                                      // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
-                                      if (e.key === 'Enter') {
-                                        e.stopPropagation() // 🛑 关键！阻止事件传给 Window
-                                        e.preventDefault()  // 🛑 阻止默认行为
-                                        
-                                        if (feedbackStatus === 'correct') {
-                                          handleNext()
-                                        } else if (index === sentenceInputs.length - 1) {
-                                          handleCheck()
+                                  <div key={index} className="relative flex flex-col items-center">
+                                    <input
+                                      ref={el => { sentenceInputRefs.current[index] = el }}
+                                      type="text"
+                                      value={showHint ? correctWord : value}
+                                      onChange={(e) => handleSentenceInputChange(index, e.target.value)}
+                                      onKeyDown={(e) => {
+                                        // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
+                                        if (e.key === 'Enter') {
+                                          e.stopPropagation()
+                                          e.preventDefault()
+                                          
+                                          if (feedbackStatus === 'correct') {
+                                            handleNext()
+                                          } else if (index === sentenceInputs.length - 1) {
+                                            handleCheck()
+                                          }
+                                          return
                                         }
-                                        return // 结束执行
-                                      }
-                                      
-                                      // 原有的空格键跳转逻辑保持不变
-                                      if (e.key === ' ' && index < sentenceInputs.length - 1) {
-                                        e.preventDefault()
-                                        sentenceInputRefs.current[index + 1]?.focus()
-                                      }
-                                      
-                                      // 原有的 Backspace 逻辑保持不变
-                                      if (e.key === 'Backspace' && !value && index > 0) {
-                                        sentenceInputRefs.current[index - 1]?.focus()
-                                      }
-                                    }}
-                                    readOnly={showHint || feedbackStatus === 'correct'}
-                                    className={`
-                                      w-20 h-14 text-xl font-serif
-                                      border-0 border-b-2 rounded-none bg-transparent
-                                      text-center focus:outline-none
-                                      ${feedbackStatus === 'correct'
-                                        ? "border-green-500 text-green-600"
-                                      : feedbackStatus === 'wrong'
-                                        ? "border-red-500 text-red-600"
-                                      : "border-stone-400 text-ink-black focus:border-[#C23E32]"
-                                      }
-                                    `}
-                                  />
+                                        
+                                        // 原有的空格键跳转逻辑保持不变
+                                        if (e.key === ' ' && index < sentenceInputs.length - 1) {
+                                          e.preventDefault()
+                                          sentenceInputRefs.current[index + 1]?.focus()
+                                        }
+                                        
+                                        // 原有的 Backspace 逻辑保持不变
+                                        if (e.key === 'Backspace' && !value && index > 0) {
+                                          sentenceInputRefs.current[index - 1]?.focus()
+                                        }
+                                      }}
+                                      readOnly={showHint || isCorrect}
+                                      style={{ width: `${minWidth}px` }}
+                                      className={`
+                                        h-12 text-lg font-serif px-2
+                                        border-0 border-b-2 rounded-none bg-transparent
+                                        text-center focus:outline-none
+                                        transition-all duration-200
+                                        ${isCorrect
+                                          ? "border-green-500 text-green-600"
+                                          : hasError && isShaking
+                                            ? "border-red-500 text-red-600 animate-shake"
+                                            : hasError
+                                              ? "border-red-500 text-red-600"
+                                              : "border-stone-400 text-ink-black focus:border-[#C23E32]"
+                                        }
+                                      `}
+                                    />
+                                  </div>
                                 )
                               })}
                             </div>
@@ -1114,6 +1393,13 @@ export default function StudyPage() {
                               ✅ Correct! Great job!
                             </div>
                           )}
+                          
+                          {/* 【新增】错误汇总提示 */}
+                          {feedbackStatus === 'wrong' && (
+                            <div className="mt-3 text-center text-red-500 font-serif text-sm">
+                              ❌ 有 {inputErrors.filter(Boolean).length} 个单词需要修改
+                            </div>
+                          )}
                           {feedbackStatus === 'wrong' && (
                             <div className="mt-3 text-center">
                               <div className="text-red-600 font-serif text-lg mb-1">
@@ -1122,8 +1408,8 @@ export default function StudyPage() {
                             </div>
                           )}
                           
-                          {/* Sentence Details */}
-                          {(feedbackStatus === 'correct' || feedbackStatus === 'wrong' || showHint) && (
+                          {/* Sentence Details - 只在回答正确或点击提示时显示 */}
+                          {(feedbackStatus === 'correct' || showHint) && (
                             <div className="mt-8 p-6 bg-stone-50 rounded-xl border border-stone-200">
                               <h4 className="text-sm font-bold text-stone-500 uppercase tracking-wide mb-4">
                                 {isLearnChinese ? "Sentence Details" : "句子详情"}
@@ -1240,6 +1526,30 @@ export default function StudyPage() {
       </div>
 
       <BottomNavBar />
+
+      {/* 升级会员弹窗 */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        type="study"
+        nativeLang={isLearnChinese ? "en" : "zh"}
+      />
     </>
+  )
+}
+
+// 默认导出组件（带 Suspense 边界）
+export default function StudyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#C23E32] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-ink-gray">加载中...</p>
+        </div>
+      </div>
+    }>
+      <StudyPageContent />
+    </Suspense>
   )
 }

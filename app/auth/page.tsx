@@ -1,11 +1,25 @@
 "use client"
 
+/**
+ * @file auth/page.tsx
+ * @description 登录页 - 使用 Supabase 官方认证
+ * @author InkWords Team
+ * @date 2026-02-14
+ * 
+ * 重要说明：
+ * - 直接使用 supabase.auth.signInWithPassword 进行登录
+ * - 不手动操作 LocalStorage，完全依赖 Supabase 自动会话管理
+ * - 登录成功后监听 AuthContext 状态更新再跳转
+ */
+
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowRight, X, Loader2, Mail, Lock, ShieldCheck } from "lucide-react"
 import { useToast } from "@/components/ink-toast/toast-context"
-import { createBrowserClient } from '@supabase/ssr'
+import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 /**
  * 登录页
@@ -13,11 +27,14 @@ import { createBrowserClient } from '@supabase/ssr'
  */
 export default function AuthPage() {
   const toast = useToast()
+  const router = useRouter()
+  const { isAuthenticated } = useAuth()
   const [account, setAccount] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [lang, setLang] = useState<"zh" | "en">("zh")
+  const [loginAttempted, setLoginAttempted] = useState(false)
 
   // 忘记密码相关状态
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -29,18 +46,37 @@ export default function AuthPage() {
   const [isSendingForgotCode, setIsSendingForgotCode] = useState(false)
   const [isResettingPassword, setIsResettingPassword] = useState(false)
 
-  // 创建 Supabase 客户端
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
+  /**
+   * 【防御逻辑】组件挂载时清理存储空间
+   * 防止 LocalStorage 爆满导致 Supabase 无法写入 Token
+   */
   useEffect(() => {
+    // 清理存储空间，确保 Supabase 有足够空间
+    try {
+      console.log('[Auth Page] 清理 LocalStorage 和 SessionStorage...')
+      localStorage.clear()
+      sessionStorage.clear()
+      console.log('[Auth Page] 存储空间已清理')
+    } catch (e) {
+      console.error('[Auth Page] 清理存储失败:', e)
+    }
+
+    // 恢复语言设置（清理后重新设置）
     const savedLang = localStorage.getItem('pref_lang') as "zh" | "en" | null
     if (savedLang) {
       setLang(savedLang)
     }
   }, [])
+
+  /**
+   * 【新增】监听认证状态变化，登录成功后跳转
+   */
+  useEffect(() => {
+    if (loginAttempted && isAuthenticated) {
+      console.log('[Auth Page] 检测到已登录状态，跳转到 /study')
+      router.push('/study')
+    }
+  }, [isAuthenticated, loginAttempted, router])
 
   const texts = {
     zh: {
@@ -87,58 +123,62 @@ export default function AuthPage() {
 
   const t = texts[lang]
 
+  /**
+   * 【核心】登录处理函数
+   * 直接使用 Supabase 官方 signInWithPassword 方法
+   * 优化：设置登录状态标记，等待 AuthContext 同步后跳转
+   */
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
     if (!account || !password) {
+      toast.error(lang === 'zh' ? '请输入账号和密码' : 'Please enter account and password')
       return
     }
     
     setIsLoading(true)
+    setLoginAttempted(false)
+    
     try {
+      console.log('[Auth Page] 开始登录...')
+      
+      // 【核心】使用 Supabase 官方登录方法
       const { data, error } = await supabase.auth.signInWithPassword({
         email: account,
         password: password,
       })
 
       if (error) {
-        console.error("登录失败:", error)
+        console.error('[Auth Page] 登录失败:', error)
         
-        // 处理邮箱未确认错误
-        if (error.message.includes('Email not confirmed')) {
-          toast.error(lang === 'zh' 
-            ? '邮箱未确认，请检查邮箱中的确认邮件，或重新发送确认邮件' 
-            : 'Email not confirmed. Please check your confirmation email or resend it.')
-          
-          // 可选：自动重新发送确认邮件
-          const { error: resendError } = await supabase.auth.resend({
-            type: 'signup',
-            email: account,
-          })
-          
-          if (!resendError) {
-            toast.success(lang === 'zh' 
-              ? '确认邮件已重新发送，请检查邮箱' 
-              : 'Confirmation email resent. Please check your inbox.')
-          }
-          return
+        // 【优化】更明显的密码错误提示
+        const isInvalidCredentials = error.message?.toLowerCase().includes('invalid') || 
+                                     error.message?.toLowerCase().includes('credentials') ||
+                                     error.message?.includes('密码') ||
+                                     error.message?.includes('password')
+        
+        if (isInvalidCredentials) {
+          // 使用更明显的错误提示
+          toast.error(
+            lang === 'zh'
+              ? '❌ 邮箱或密码错误，请重新输入'
+              : '❌ Invalid email or password, please try again'
+          )
+        } else {
+          toast.error(
+            lang === 'zh' ? '❌ 登录失败：' + error.message : '❌ Login failed: ' + error.message
+          )
         }
-        
-        toast.error(lang === 'zh' ? '登录失败：' + error.message : 'Login failed: ' + error.message)
-        return
+      } else if (data.user) {
+        console.log('[Auth Page] Supabase 登录成功，等待 AuthContext 同步...')
+        setLoginAttempted(true)
+        // 不立即跳转，由 useEffect 监听 isAuthenticated 变化后跳转
       }
-
-      if (data.user) {
-        localStorage.setItem("isLoggedIn", "true")
-        localStorage.setItem("inkwords_user", JSON.stringify(data.user))
-        
-        // 使用 window.location.href 进行跳转
-        window.location.href = '/study'
-      }
-    } catch (error) {
-      console.error("登录失败:", error)
+    } catch (error: any) {
+      console.error('[Auth Page] 登录异常:', error)
       toast.error(lang === 'zh' ? '登录失败，请稍后重试' : 'Login failed, please try again later')
     } finally {
+      // 【关键】无论成功失败，必须释放按钮
       setIsLoading(false)
     }
   }

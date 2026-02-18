@@ -13,6 +13,12 @@ const fontSizeOptions = [
   { id: "xlarge", label: "Extra Large", value: "20px" },
 ]
 
+// localStorage keys
+const STORAGE_KEYS = {
+  FONT_SIZE: 'inkwords_font_size',
+  DARK_MODE: 'inkwords_dark_mode',
+}
+
 const UI_TEXT = {
   zh: {
     pageTitle: "外观设置",
@@ -37,12 +43,31 @@ export default function AppearancePage() {
   const [fontSize, setFontSize] = useState("medium")
   const [darkMode, setDarkMode] = useState(false)
   const [currentLang, setCurrentLang] = useState<"zh" | "en">("zh")
+  const [isLoaded, setIsLoaded] = useState(false)
 
+  /**
+   * 从 localStorage 加载保存的设置
+   */
   useEffect(() => {
+    // 加载字体大小设置
+    const savedFontSize = localStorage.getItem(STORAGE_KEYS.FONT_SIZE)
+    if (savedFontSize && fontSizeOptions.some(opt => opt.id === savedFontSize)) {
+      setFontSize(savedFontSize)
+    }
+
+    // 加载深色模式设置
+    const savedDarkMode = localStorage.getItem(STORAGE_KEYS.DARK_MODE)
+    if (savedDarkMode !== null) {
+      setDarkMode(savedDarkMode === 'true')
+    }
+
+    // 加载语言设置
     const savedNative = localStorage.getItem("inkwords_native_lang") as "zh" | "en" | null
     if (savedNative) {
       setCurrentLang(savedNative)
     }
+
+    setIsLoaded(true)
   }, [])
 
   /**
@@ -66,12 +91,40 @@ export default function AppearancePage() {
     router.push("/profile")
   }
 
+  /**
+   * 处理字体大小变化
+   */
   const handleFontSizeChange = (sizeId: string) => {
     setFontSize(sizeId)
+    // 保存到 localStorage
+    localStorage.setItem(STORAGE_KEYS.FONT_SIZE, sizeId)
+    // 应用到全局（可选）
+    document.documentElement.style.fontSize = fontSizeOptions.find(opt => opt.id === sizeId)?.value || '16px'
   }
 
+  /**
+   * 处理深色模式切换
+   */
   const handleDarkModeToggle = () => {
-    setDarkMode(!darkMode)
+    const newDarkMode = !darkMode
+    setDarkMode(newDarkMode)
+    // 保存到 localStorage
+    localStorage.setItem(STORAGE_KEYS.DARK_MODE, String(newDarkMode))
+    // 应用到全局
+    if (newDarkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+
+  // 加载完成前显示加载状态，避免闪烁
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-ink-paper flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-ink-vermilion border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (

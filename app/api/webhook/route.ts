@@ -7,12 +7,16 @@
  * 功能：
  * - 验证 Stripe 签名
  * - 处理 checkout.session.completed (支付成功)
+ * - 处理 invoice.payment_succeeded (续费成功)
  * - 处理 invoice.payment_failed (续费失败)
- * - 更新用户会员状态
+ * - 处理 customer.subscription.updated (订阅更新)
+ * - 处理 customer.subscription.deleted (订阅删除)
+ * - 更新用户会员状态和订阅类型
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { SupabaseClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
 
 /**
@@ -30,11 +34,42 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 /**
+ * 获取订阅类型
+ * 根据 subscription.items.data[0].price.recurring.interval 判断
+ *
+ * @param subscription - Stripe Subscription 对象
+ * @returns 'monthly' | 'yearly' | 'lifetime'
+ */
+function getSubscriptionType(subscription: Stripe.Subscription): 'monthly' | 'yearly' | 'lifetime' {
+  const item = subscription.items.data[0]
+  if (!item || !item.price) {
+    return 'monthly' // 默认月度
+  }
+
+  // 检查是否为一次性付款（终身会员）
+  if (item.price.type === 'one_time') {
+    return 'lifetime'
+  }
+
+  // 检查周期性订阅
+  const interval = item.price.recurring?.interval
+  if (interval === 'year') {
+    return 'yearly'
+  }
+
+  // 默认为月度
+  return 'monthly'
+}
+
+/**
  * 处理 Stripe Webhook 请求
  *
  * 支持的事件类型：
  * - checkout.session.completed: 支付成功，激活会员
+ * - invoice.payment_succeeded: 续费成功，更新到期时间
  * - invoice.payment_failed: 续费失败，取消会员
+ * - customer.subscription.updated: 订阅更新
+ * - customer.subscription.deleted: 订阅删除
  */
 export async function POST(request: NextRequest) {
   console.log('[WEBHOOK API] 收到 Stripe Webhook 请求')
@@ -67,13 +102,19 @@ export async function POST(request: NextRequest) {
 
     console.log('[WEBHOOK API] 事件类型:', event.type)
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // 处理不同的事件类型
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         await handleCheckoutSessionCompleted(session, supabase)
+        break
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice
+        await handleInvoicePaymentSucceeded(invoice, supabase)
         break
       }
 
@@ -115,16 +156,18 @@ export async function POST(request: NextRequest) {
  *
  * 功能：
  * - 从 session.metadata 获取 userId
- * - 获取订阅信息
+ * - 获取订阅详情
+ * - 判断订阅类型 (monthly/yearly/lifetime)
  * - 更新用户会员状态为 Pro
  * - 设置会员到期时间
+ * - 写入 subscription_type
  *
  * @param session - Stripe Checkout Session
  * @param supabase - Supabase 客户端
  */
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
-  supabase: ReturnType<typeof createServerClient>
+  supabase: SupabaseClient
 ) {
   console.log('[WEBHOOK API] 处理支付成功事件:', session.id)
 
@@ -147,10 +190,14 @@ async function handleCheckoutSessionCompleted(
   const subscription = await stripe.subscriptions.retrieve(subscriptionId)
   const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000)
 
+  // 判断订阅类型
+  const subscriptionType = getSubscriptionType(subscription)
+
   console.log('[WEBHOOK API] 订阅信息:', {
     subscriptionId,
     currentPeriodEnd,
     status: subscription.status,
+    subscriptionType,
   })
 
   // 更新用户会员状态
@@ -160,6 +207,7 @@ async function handleCheckoutSessionCompleted(
       is_pro: true,
       current_period_end: currentPeriodEnd.toISOString(),
       stripe_subscription_id: subscriptionId,
+      subscription_type: subscriptionType,
     })
     .eq('id', userId)
 
@@ -168,7 +216,69 @@ async function handleCheckoutSessionCompleted(
     throw error
   }
 
-  console.log('[WEBHOOK API] 用户会员状态已更新:', userId)
+  console.log('[WEBHOOK API] 用户会员状态已更新:', userId, '类型:', subscriptionType)
+}
+
+/**
+ * 处理续费成功事件
+ *
+ * 功能：
+ * - 从 invoice 获取 subscription
+ * - 获取订阅详情
+ * - 判断订阅类型
+ * - 更新到期时间和订阅类型
+ *
+ * @param invoice - Stripe Invoice
+ * @param supabase - Supabase 客户端
+ */
+async function handleInvoicePaymentSucceeded(
+  invoice: Stripe.Invoice,
+  supabase: SupabaseClient
+) {
+  console.log('[WEBHOOK API] 处理续费成功事件:', invoice.id)
+
+  const subscriptionId = (invoice as any).subscription as string
+
+  if (!subscriptionId) {
+    console.log('[WEBHOOK API] Invoice 中没有 subscription，跳过处理')
+    return
+  }
+
+  // 获取订阅详情
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId as string)
+  const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000)
+
+  // 判断订阅类型
+  const subscriptionType = getSubscriptionType(subscription)
+
+  // 查找对应的用户
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('id, email')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (userError || !user) {
+    console.error('[WEBHOOK API] 未找到对应用户:', userError)
+    return
+  }
+
+  // 更新用户会员状态
+  const { error } = await supabase
+    .from('users')
+    .update({
+      is_pro: true,
+      current_period_end: currentPeriodEnd.toISOString(),
+      subscription_type: subscriptionType,
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('[WEBHOOK API] 更新用户会员状态失败:', error)
+    throw error
+  }
+
+  console.log('[WEBHOOK API] 用户续费成功，状态已更新:', user.email, '类型:', subscriptionType)
 }
 
 /**
@@ -184,7 +294,7 @@ async function handleCheckoutSessionCompleted(
  */
 async function handleInvoicePaymentFailed(
   invoice: Stripe.Invoice,
-  supabase: ReturnType<typeof createServerClient>
+  supabase: Awaited<ReturnType<typeof createServerClient>>
 ) {
   console.log('[WEBHOOK API] 处理续费失败事件:', invoice.id)
 
@@ -229,13 +339,14 @@ async function handleInvoicePaymentFailed(
  * 功能：
  * - 将用户会员状态设为 false
  * - 清除订阅 ID
+ * - 清除订阅类型
  *
  * @param subscription - Stripe Subscription
  * @param supabase - Supabase 客户端
  */
 async function handleSubscriptionDeleted(
   subscription: Stripe.Subscription,
-  supabase: ReturnType<typeof createServerClient>
+  supabase: SupabaseClient
 ) {
   console.log('[WEBHOOK API] 处理订阅删除事件:', subscription.id)
 
@@ -257,6 +368,7 @@ async function handleSubscriptionDeleted(
     .update({
       is_pro: false,
       stripe_subscription_id: null,
+      subscription_type: null,
     })
     .eq('id', user.id)
 
@@ -274,13 +386,14 @@ async function handleSubscriptionDeleted(
  * 功能：
  * - 更新会员到期时间
  * - 根据订阅状态更新 is_pro
+ * - 更新订阅类型
  *
  * @param subscription - Stripe Subscription
  * @param supabase - Supabase 客户端
  */
 async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription,
-  supabase: ReturnType<typeof createServerClient>
+  supabase: SupabaseClient
 ) {
   console.log('[WEBHOOK API] 处理订阅更新事件:', subscription.id)
 
@@ -299,12 +412,16 @@ async function handleSubscriptionUpdated(
   const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000)
   const isActive = subscription.status === 'active' || subscription.status === 'trialing'
 
+  // 判断订阅类型
+  const subscriptionType = getSubscriptionType(subscription)
+
   // 更新用户会员状态
   const { error } = await supabase
     .from('users')
     .update({
       is_pro: isActive,
       current_period_end: currentPeriodEnd.toISOString(),
+      subscription_type: subscriptionType,
     })
     .eq('id', user.id)
 
@@ -313,5 +430,5 @@ async function handleSubscriptionUpdated(
     throw error
   }
 
-  console.log('[WEBHOOK API] 用户订阅已更新:', user.id, '状态:', subscription.status)
+  console.log('[WEBHOOK API] 用户订阅已更新:', user.id, '状态:', subscription.status, '类型:', subscriptionType)
 }

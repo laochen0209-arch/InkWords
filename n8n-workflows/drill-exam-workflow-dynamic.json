@@ -1,0 +1,219 @@
+{
+  "name": "InkWords_DrillExam_Generator_Dynamic",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-exam",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-400, 0],
+      "id": "webhook-trigger",
+      "name": "📥 Webhook 触发",
+      "webhookId": "generate-exam"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 Webhook 传入的参数\nconst body = items[0].json.body;\n\n// 提取核心参数\nconst targetLanguage = body.targetLanguage || 'English';\nconst examType = body.examType || 'IELTS';\nconst level = body.level || 'Intermediate';\nconst category = body.category || examType;\nconst userId = body.userId || 'anonymous';\nconst requestId = body.requestId || `req_${Date.now()}`;\n\n// 根据目标语言确定内容语言\nconst isChinese = targetLanguage === 'Chinese';\n\n// 构建系统提示词\nconst systemPrompt = isChinese \n  ? `你是一个专业的中文考试命题专家。请为${examType}考试生成一套完整的综合模拟试卷，难度等级：${level}。\\n\\n## 试卷结构要求\\n\\n返回的JSON必须包含 sections 数组，包含以下三个部分：\\n\\n### Section 1: 听力 (listening)\\n- type: 'listening'\\n- title: '听力理解'\\n- transcript: 一段150-200字的中文对话或独白（适合${level}难度）\\n- questions: 3道选择题，基于听力内容\\n  - type: 'multiple_choice'\\n  - 每题4个选项 (A/B/C/D)\\n  - 包含正确答案和详细解析\\n\\n### Section 2: 阅读 (reading)\\n- type: 'reading'\\n- title: '阅读理解'\\n- content: 一篇约300字的中文短文（适合${level}难度）\\n- questions: 4道题\\n  - 2道判断题 (type: 'true_false')，选项为 ['正确', '错误']\\n  - 2道选择题 (type: 'multiple_choice')，每题4个选项\\n  - 包含正确答案和详细解析\\n\\n### Section 3: 词汇 (vocabulary)\\n- type: 'vocabulary'\\n- title: '词汇运用'\\n- questions: 3道填空题\\n  - type: 'fill_blank'\\n  - stem: 包含____的句子，需要填写正确词语\\n  - 不包含options字段\\n  - 包含正确答案和详细解析\\n\\n## 题目格式示例\\n\\n选择题：\\n{\\n  id: 'l1',\\n  type: 'multiple_choice',\\n  stem: '这段对话主要讨论了什么？',\\n  options: ['A. 天气变化', 'B. 旅行计划', 'C. 工作安排', 'D. 兴趣爱好'],\\n  answer: 'B',\\n  analysis: '对话中两人主要讨论了即将到来的巴黎之旅...'\\n}\\n\\n判断题：\\n{\\n  id: 'r1',\\n  type: 'true_false',\\n  stem: '作者认为技术总是有益的。',\\n  options: ['正确', '错误'],\\n  answer: '错误',\\n  analysis: '作者提到了技术的好处和弊端...'\\n}\\n\\n填空题：\\n{\\n  id: 'v1',\\n  type: 'fill_blank',\\n  stem: '这个项目的_____耗时比预期长。',\\n  answer: '完成',\\n  analysis: ''完成'指结束某事的行为...'\\n}\\n\\n## 注意事项\\n1. 所有题目必须包含id、type、stem、answer、analysis字段\\n2. 选择题必须包含options数组\\n3. 确保题目难度与${level}匹配\\n4. 每个题目的analysis字段必须提供详细解析\\n5. 返回纯JSON格式，不要包含markdown代码块标记`\n  : `You are a professional exam question generator for ${examType}. Create a comprehensive practice exam at ${level} level.\\n\\n## Exam Structure Requirements\\n\\nReturn a JSON object with a sections array containing three sections:\\n\\n### Section 1: Listening\\n- type: 'listening'\\n- title: 'Listening Comprehension'\\n- transcript: A 150-200 word English dialogue or monologue (appropriate for ${level})\\n- questions: 3 multiple choice questions based on the transcript\\n  - type: 'multiple_choice'\\n  - 4 options (A/B/C/D) per question\\n  - Include correct answer and detailed explanation\\n\\n### Section 2: Reading\\n- type: 'reading'\\n- title: 'Reading Comprehension'\\n- content: A ~300 word English passage (appropriate for ${level})\\n- questions: 4 questions\\n  - 2 true/false questions (type: 'true_false'), options: ['True', 'False']\\n  - 2 multiple choice questions, 4 options each\\n  - Include correct answer and detailed explanation\\n\\n### Section 3: Vocabulary\\n- type: 'vocabulary'\\n- title: 'Vocabulary Application'\\n- questions: 3 fill-in-the-blank questions\\n  - type: 'fill_blank'\\n  - stem: A sentence with ____ that needs the correct word\\n  - No options field\\n  - Include correct answer and detailed explanation\\n\\n## Question Format Examples\\n\\nMultiple Choice:\\n{\\n  id: 'l1',\\n  type: 'multiple_choice',\\n  stem: 'What is the main topic of this dialogue?',\\n  options: ['A. Weather changes', 'B. Travel plans', 'C. Work arrangements', 'D. Hobbies'],\\n  answer: 'B',\\n  analysis: 'The two speakers mainly discuss their upcoming trip to Paris...'\\n}\\n\\nTrue/False:\\n{\\n  id: 'r1',\\n  type: 'true_false',\\n  stem: 'The author believes technology is always beneficial.',\\n  options: ['True', 'False'],\\n  answer: 'False',\\n  analysis: 'The author mentions both benefits and drawbacks of technology...'\\n}\\n\\nFill-in-the-blank:\\n{\\n  id: 'v1',\\n  type: 'fill_blank',\\n  stem: 'The _____ of this project took longer than expected.',\\n  answer: 'completion',\\n  analysis: ''Completion' refers to the act of finishing something...'\\n}\\n\\n## Important Notes\\n1. All questions must include id, type, stem, answer, and analysis fields\\n2. Multiple choice questions must include an options array\\n3. Ensure question difficulty matches ${level}\\n4. Each question's analysis field must provide detailed explanation\\n5. Return pure JSON format without markdown code block markers`;\n\n// 构建用户提示词\nconst userPrompt = isChinese\n  ? `请为${examType}考试生成一套完整的综合模拟试卷。\\n\\n考试类型：${examType}\\n目标语言：中文\\n难度等级：${level}\\n分类：${category}\\n\\n请严格按照系统提示词中的格式要求生成试卷，确保所有字段完整且格式正确。`\n  : `Please generate a comprehensive practice exam for ${examType}.\\n\\nExam Type: ${examType}\\nTarget Language: English\\nDifficulty Level: ${level}\\nCategory: ${category}\\n\\nPlease follow the format requirements in the system prompt strictly and ensure all fields are complete and correctly formatted.`;\n\n// 输出结果\nreturn [{\n  json: {\n    systemPrompt,\n    userPrompt,\n    examType,\n    targetLanguage,\n    level,\n    category,\n    userId,\n    requestId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-180, 0],
+      "id": "parse-params",
+      "name": "🔧 解析参数"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.DEEPSEEK_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "deepseek-chat"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [\n  {\n    \"role\": \"system\",\n    \"content\": $json.systemPrompt\n  },\n  {\n    \"role\": \"user\",\n    \"content\": $json.userPrompt\n  }\n] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {\"type\": \"json_object\"} }}"
+            },
+            {
+              "name": "temperature",
+              "value": "0.7"
+            },
+            {
+              "name": "max_tokens",
+              "value": "4000"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [40, 0],
+      "id": "deepseek-generate",
+      "name": "🤖 DeepSeek 生成"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🧹 清洗解析 DeepSeek 响应\nconst raw = items[0].json.choices[0].message.content;\n\n// 去除非法字符\nconst clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();\n\n// 解析成对象\nlet data = {};\ntry {\n  data = JSON.parse(clean);\n} catch (e) {\n  console.error('JSON解析错误:', e);\n  console.error('原始内容:', raw);\n  data = {\n    sections: []\n  };\n}\n\n// 获取参数\nconst params = $('🔧 解析参数').first().json;\n\n// 确保sections存在\nif (!data.sections || !Array.isArray(data.sections)) {\n  data.sections = [];\n}\n\n// 输出纯净数据\nreturn [{\n  json: {\n    exam_type: params.examType,\n    target_language: params.targetLanguage,\n    level: params.level,\n    category: params.category,\n    user_id: params.userId,\n    request_id: params.requestId,\n    sections: data.sections,\n    raw_response: clean\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0],
+      "id": "clean-response",
+      "name": "📦 清洗响应"
+    },
+    {
+      "parameters": {
+        "tableId": "mock_exams",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "exam_type": "={{ $json.exam_type }}",
+            "sections": "={{ JSON.stringify($json.sections) }}",
+            "title_en": "={{ 'Comprehensive Drill - ' + $json.exam_type + ' (' + $json.level + ')' }}",
+            "rewritten_content": "={{ 'Generated for ' + $json.user_id + ' | Request: ' + $json.request_id }}",
+            "target_language": "={{ $json.target_language }}",
+            "level": "={{ $json.level }}",
+            "category": "={{ $json.category }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [480, 0],
+      "id": "supabase-insert",
+      "name": "💾 入库 Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "Supabase account",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "jsonPayload": "={{ {\n  \"success\": true,\n  \"message\": \"Exam generated successfully\",\n  \"data\": {\n    \"examType\": $json.exam_type,\n    \"targetLanguage\": $json.target_language,\n    \"level\": $json.level,\n    \"requestId\": $json.request_id,\n    \"sectionsCount\": $json.sections.length\n  }\n} }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 0],
+      "id": "webhook-response",
+      "name": "📤 返回响应"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hours": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [-400, 200],
+      "id": "timer-trigger",
+      "name": "⏱️ 定时触发"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "exam_types",
+              "value": "IELTS,TOEFL,CET-4,CET-6,HSK,BCT,TOCFL"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [-180, 200],
+      "id": "default-config",
+      "name": "⚙️ 默认配置"
+    },
+    {
+      "parameters": {
+        "jsCode": "const examTypes = $('⚙️ 默认配置').first().json.exam_types.split(',');\n\n// 为每种考试类型生成一个任务\nconst items = examTypes.map((type, index) => ({\n  json: {\n    body: {\n      targetLanguage: ['HSK', 'BCT', 'TOCFL'].includes(type.trim()) ? 'Chinese' : 'English',\n      examType: type.trim(),\n      level: getDefaultLevel(type.trim()),\n      category: type.trim(),\n      userId: 'system',\n      requestId: `scheduled_${Date.now()}_${index}`\n    }\n  }\n}));\n\nfunction getDefaultLevel(examType) {\n  const defaults = {\n    'HSK': 'Level 3',\n    'BCT': 'Level A',\n    'TOCFL': 'Level 3',\n    'IELTS': 'Band 6.0',\n    'TOEFL': '61-90',\n    'CET-4': 'Level 2',\n    'CET-6': 'Level 2'\n  };\n  return defaults[examType] || 'Intermediate';\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 200],
+      "id": "split-types",
+      "name": "🔄 拆分类型"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [260, 200],
+      "id": "batch-process",
+      "name": "📦 批量处理"
+    }
+  ],
+  "connections": {
+    "📥 Webhook 触发": {
+      "main": [[{ "node": "🔧 解析参数", "type": "main", "index": 0 }]]
+    },
+    "🔧 解析参数": {
+      "main": [[{ "node": "🤖 DeepSeek 生成", "type": "main", "index": 0 }]]
+    },
+    "🤖 DeepSeek 生成": {
+      "main": [[{ "node": "📦 清洗响应", "type": "main", "index": 0 }]]
+    },
+    "📦 清洗响应": {
+      "main": [[{ "node": "💾 入库 Supabase", "type": "main", "index": 0 }]]
+    },
+    "💾 入库 Supabase": {
+      "main": [[{ "node": "📤 返回响应", "type": "main", "index": 0 }]]
+    },
+    "⏱️ 定时触发": {
+      "main": [[{ "node": "⚙️ 默认配置", "type": "main", "index": 0 }]]
+    },
+    "⚙️ 默认配置": {
+      "main": [[{ "node": "🔄 拆分类型", "type": "main", "index": 0 }]]
+    },
+    "🔄 拆分类型": {
+      "main": [[{ "node": "📦 批量处理", "type": "main", "index": 0 }]]
+    },
+    "📦 批量处理": {
+      "main": [[{ "node": "🔧 解析参数", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": []
+}

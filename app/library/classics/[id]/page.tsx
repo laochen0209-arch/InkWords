@@ -1,10 +1,17 @@
 "use client"
 
-import { useState, useEffect, use, useMemo } from "react"
+/**
+ * @file page.tsx
+ * @description 经典文章阅读页面
+ * @author InkWords Team
+ * @date 2026-02-08
+ * @version 2.0.0 - 修复语音播放问题
+ */
+
+import { useState, useEffect, use, useMemo, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Type, ArrowLeft, Volume2, Sparkles } from "lucide-react"
 import { motion } from "framer-motion"
-import { InteractiveParagraph } from "@/components/reader/interactive-paragraph"
 
 interface ArticleData {
   title_en: string
@@ -17,16 +24,142 @@ interface ArticleData {
 interface Para { en: string; zh: string }
 interface Vocab { word: string; mean: string }
 
+// 【关键修复】全局语音状态，确保所有组件共享
+let globalVoicesLoaded = false
+let globalVoices: SpeechSynthesisVoice[] = []
+let currentUtterance: SpeechSynthesisUtterance | null = null
+
+/**
+ * 【关键修复】获取最佳语音
+ */
+const getBestVoice = (lang: string): SpeechSynthesisVoice | null => {
+  if (!globalVoicesLoaded || globalVoices.length === 0) {
+    globalVoices = window.speechSynthesis.getVoices()
+  }
+
+  if (globalVoices.length === 0) return null
+
+  // 优先 Google/Microsoft 语音
+  const googleVoice = globalVoices.find(v =>
+    v.lang === lang && v.name.toLowerCase().includes("google")
+  )
+  if (googleVoice) return googleVoice
+
+  const microsoftVoice = globalVoices.find(v =>
+    v.lang === lang && v.name.toLowerCase().includes("microsoft")
+  )
+  if (microsoftVoice) return microsoftVoice
+
+  // 回退到第一个匹配的语音
+  return globalVoices.find(v => v.lang === lang) || null
+}
+
+/**
+ * 【关键修复】语音播放函数，添加预加载和错误处理
+ */
 const speak = (text: string, lang = 'zh-CN') => {
-  if (!text) return
-  window.speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = lang
-  const voices = window.speechSynthesis.getVoices()
-  const bestVoice = voices.find(v => v.lang.includes(lang.replace('-', '_')) || v.lang.includes(lang))
-  if (bestVoice) u.voice = bestVoice
-  u.rate = lang === 'en-US' ? 1.0 : 0.9
-  window.speechSynthesis.speak(u)
+  if (!text || typeof window === 'undefined') return
+
+  try {
+    // 【关键修复】停止之前的播放
+    if (currentUtterance) {
+      window.speechSynthesis.cancel()
+      currentUtterance = null
+    }
+
+    // 【关键修复】Chrome 浏览器需要 resume
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+    }
+
+    // 【关键修复】确保语音列表已加载
+    if (!globalVoicesLoaded) {
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        globalVoices = voices
+        globalVoicesLoaded = true
+      }
+    }
+
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = lang
+
+    // 【关键修复】设置最佳语音
+    const bestVoice = getBestVoice(lang)
+    if (bestVoice) {
+      u.voice = bestVoice
+      console.log('[Library Speak] 使用语音:', bestVoice.name)
+    }
+
+    u.rate = lang === 'en-US' ? 1.0 : 0.9
+    u.pitch = 1.0
+    u.volume = 1.0
+
+    // 【关键修复】添加播放状态管理
+    u.onstart = () => {
+      console.log('[Library Speak] 开始播放:', text.substring(0, 30) + '...')
+    }
+
+    u.onend = () => {
+      console.log('[Library Speak] 播放结束')
+      currentUtterance = null
+    }
+
+    // 错误处理
+    u.onerror = (event) => {
+      if (event.error === 'interrupted' || event.error === 'canceled') {
+        console.log('[Library Speak] 播放被中断（正常）')
+      } else {
+        console.error('[Library Speak] 播放错误:', event.error)
+      }
+      currentUtterance = null
+    }
+
+    currentUtterance = u
+
+    // 【关键修复】使用 setTimeout 确保在用户交互上下文中执行
+    setTimeout(() => {
+      try {
+        // 再次检查并恢复语音合成（Chrome 需要）
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume()
+        }
+        window.speechSynthesis.speak(u)
+      } catch (error) {
+        console.error('[Library Speak] 播放失败:', error)
+        currentUtterance = null
+      }
+    }, 50)
+  } catch (error) {
+    console.error('[Library Speak] 播放失败:', error)
+    currentUtterance = null
+  }
+}
+
+/**
+ * 【关键修复】预加载语音列表
+ */
+const preloadVoices = () => {
+  if (typeof window === 'undefined') return
+  
+  const loadVoices = () => {
+    const voices = window.speechSynthesis.getVoices()
+    if (voices.length > 0) {
+      globalVoices = voices
+      globalVoicesLoaded = true
+      console.log('[Library Speak] 语音列表已加载:', voices.length)
+    }
+  }
+  
+  loadVoices()
+  
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    const originalHandler = window.speechSynthesis.onvoiceschanged
+    window.speechSynthesis.onvoiceschanged = (ev) => {
+      loadVoices()
+      if (originalHandler) originalHandler.call(window.speechSynthesis, ev)
+    }
+  }
 }
 
 const RenderEnglish = ({ text, vocabMap, fontSize }: { text: string, vocabMap: Map<string, string>, fontSize: string }) => {
@@ -137,7 +270,8 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
   const [size, setSize] = useState<"lg" | "xl">("lg")
 
   useEffect(() => {
-    if (typeof window !== 'undefined') window.speechSynthesis.getVoices()
+    // 【关键修复】预加载语音列表
+    preloadVoices()
   }, [])
 
   const vocabMap = useMemo(() => {
@@ -202,17 +336,44 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
         }
         
         if (pList.length === 0) {
-          const split = (t: string) => t.split(/\r?\n/).filter((x: string) => x.trim()) || []
-          let enTxt = cEn.trim().startsWith('{') ? "" : cEn
-          let en = split(enTxt)
-          let zh = split(cZh.replace(/【.*?】/g, '').trim())
+          // 🛠️ 智能拆句函数 - 支持中英文标点
+          const splitBySentence = (text: string, isChinese = false): string[] => {
+            if (!text) return []
+
+            // 首先按换行分割，然后对每一行按标点分割
+            const lines = text.split(/\r?\n/).filter(line => line.trim())
+            const result: string[] = []
+
+            // 根据语言选择句子分割正则
+            const sentenceRegex = isChinese
+              ? /[^。！？]+[。！？]+["']?/g  // 中文：按 。！？ 分割
+              : /[^.!?]+[.!?]+["']?/g      // 英文：按 .!? 分割
+
+            for (const line of lines) {
+              const trimmedLine = line.trim()
+              if (!trimmedLine) continue
+
+              // 尝试按句子标点分割
+              const sentences = trimmedLine.match(sentenceRegex)
+              
+              if (sentences && sentences.length > 0) {
+                // 如果成功分割出多个句子，添加每个句子
+                for (const sentence of sentences) {
+                  const trimmed = sentence.trim()
+                  if (trimmed) result.push(trimmed)
+                }
+              } else {
+                // 如果没有找到句子标点，将整个行作为一句
+                result.push(trimmedLine)
+              }
+            }
+
+            return result
+          }
           
-          if (enTxt.length > 100) {
-            en = enTxt.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map((s: string) => s.trim()) || []
-          }
-          if (cZh.length > 100) {
-            zh = cZh.match(/[^。！？]+[。！？]+["']?|[^。！？]+$/g)?.map((s: string) => s.trim()) || []
-          }
+          let enTxt = cEn.trim().startsWith('{') ? "" : cEn
+          let en = splitBySentence(enTxt, false)  // 英文使用英文标点分割
+          let zh = splitBySentence(cZh.replace(/【.*?】/g, '').trim(), true)  // 中文使用中文标点分割
           
           for (let i = 0; i < Math.min(en.length, zh.length); i++) {
             const enPara = en[i] || ""
@@ -262,7 +423,7 @@ export default function UnifiedReaderPage({ params }: { params: Promise<{ id: st
   const zhTextSize = size === 'xl' ? 'text-xl' : 'text-lg'
 
   return (
-    <div className="min-h-screen" style={{ backgroundImage: 'url("/去文字.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div className="min-h-screen" style={{ backgroundImage: 'url("/去文字.png")', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       <header className="fixed top-0 inset-x-0 z-50 h-16 bg-[#FDFBF7]/25 backdrop-blur-md border-b border-stone-200/50 flex items-center justify-between px-4">
         <button onClick={() => router.back()} className="p-2 rounded-full hover:bg-stone-100 transition-colors"><ArrowLeft className="w-6 h-6 text-stone-600" /></button>
         <div className="text-center">

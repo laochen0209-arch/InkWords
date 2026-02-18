@@ -3,11 +3,10 @@
 /**
  * @file MockContent.tsx
  * @description 模拟考试内容组件 - 包含所有客户端逻辑
- * @author InkWords Team
- * @date 2026-01-29
+ * @version 2.1.0 - 添加 URL + LocalStorage 状态持久化
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -25,11 +24,27 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
+// LocalStorage keys
+const STORAGE_KEYS = {
+  MOCK_EXAM_TYPE: 'inkwords_mock_exam_type'
+}
+
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') return defaultValue
+  try {
+    const item = localStorage.getItem(key)
+    return item ? JSON.parse(item) : defaultValue
+  } catch {
+    return defaultValue
+  }
+}
+
 interface MockExam {
   id: string;
   title_en: string;
   rewritten_content: string;
   questions: any[];
+  sections: any[];  // N8N 生成的数据格式
   exam_type: string;
 }
 
@@ -38,29 +53,38 @@ interface MockExam {
  * @returns JSX.Element
  */
 export default function MockContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // 从 URL 或 LocalStorage 获取初始状态
+  const getInitialType = useCallback(() => {
+    const urlType = searchParams.get("type")
+    return urlType || loadFromStorage(STORAGE_KEYS.MOCK_EXAM_TYPE, "IELTS")
+  }, [searchParams])
+
+  const [currentType, setCurrentType] = useState(getInitialType)
   const [exam, setExam] = useState<MockExam | null>(null);
   const [loading, setLoading] = useState(true);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
 
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const currentType = searchParams.get("type") || "IELTS";
-
   const exams = ["IELTS", "TOEFL", "CET-4", "CET-6", "HSK", "BCT", "TOCFL"];
 
   /**
-   * 切换考试类型
+   * 切换考试类型（带状态持久化）
    * @param newType - 新的考试类型
    */
-  const handleSwitch = (newType: string) => {
+  const handleSwitch = useCallback((newType: string) => {
+    // 保存到 LocalStorage
+    localStorage.setItem(STORAGE_KEYS.MOCK_EXAM_TYPE, JSON.stringify(newType))
+    // 更新 URL 并导航
     const params = new URLSearchParams(searchParams.toString());
     params.set("type", newType);
     console.log("Switching to:", newType);
     router.push(`${pathname}?${params.toString()}`);
-  };
+  }, [pathname, router, searchParams]);
 
   /**
    * 获取考试数据
@@ -72,26 +96,57 @@ export default function MockContent() {
       setUserAnswers({});
       setScore(0);
 
-      const { count } = await supabase
+      // 使用简单查询获取所有该类型的试卷
+      const { data: allExams, error: fetchError } = await supabase
         .from("mock_exams")
-        .select("*", { count: 'exact', head: true })
-        .eq("exam_type", currentType);
-      if (!count) {
+        .select("*")
+        .eq("exam_type", currentType)
+        .order("created_at", { ascending: false });
+
+      if (fetchError) {
+        console.error("[Mock] 获取试卷失败:", fetchError);
         setExam(null);
         setLoading(false);
         return;
       }
-      const randomOffset = Math.floor(Math.random() * count);
-      const { data, error } = await supabase
-        .from("mock_exams")
-        .select("*")
-        .eq("exam_type", currentType)
-        .range(randomOffset, randomOffset)
-        .single();
-      if (error) throw error;
+
+      // 判断有效试卷：只要有 questions 或 sections 任一字段有内容即可
+      const isValidExam = (exam: any) => {
+        const hasQuestions = exam.questions && exam.questions.length > 0;
+        const hasSections = exam.sections && 
+          (typeof exam.sections === 'string' ? exam.sections.length > 2 : exam.sections.length > 0);
+        return hasQuestions || hasSections;
+      };
+
+      // 过滤出有效试卷
+      const validExams = (allExams || []).filter(isValidExam);
+
+      if (validExams.length === 0) {
+        console.log('[Mock] 没有找到有效试卷');
+        setExam(null);
+        setLoading(false);
+        return;
+      }
+
+      // 随机选择一份试卷
+      const randomIndex = Math.floor(Math.random() * validExams.length);
+      const data = validExams[randomIndex];
+
+      // 兼容 N8N 生成的数据格式（sections 有数据但 questions 为 null）
+      if ((!data.questions || data.questions.length === 0) && data.sections) {
+        console.log('[Mock] 检测到 sections 格式数据，正在转换...');
+        const sections = typeof data.sections === 'string'
+          ? JSON.parse(data.sections)
+          : data.sections;
+        // 从 sections 中提取所有 questions
+        data.questions = sections.flatMap((s: any) => s.questions || []);
+        console.log('[Mock] 转换完成，共提取', data.questions.length, '道题');
+      }
+
       setExam(data);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("[Mock] Error:", err);
+      setExam(null);
     } finally {
       setLoading(false);
     }
@@ -180,7 +235,8 @@ export default function MockContent() {
         <div className="flex items-center gap-3">
           {isSubmitted && <span className="text-lg font-bold text-amber-600">Score: {score}</span>}
           <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-mono border border-slate-200">
-            {exam?.questions?.length || 0} Qs
+            {(exam?.questions?.length || exam?.sections?.reduce((acc: number, s: any) =>
+              acc + (s.questions?.length || 0), 0) || 0)} Qs
           </span>
         </div>
       </header>

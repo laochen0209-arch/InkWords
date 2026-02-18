@@ -1,31 +1,36 @@
 "use client"
 
-import { useState, useEffect } from "react"
+/**
+ * @file page.tsx
+ * @description 首页/仪表盘页面 - 优化版（减少重复请求）
+ * @author InkWords Team
+ * @date 2026-02-18
+ * @version 4.0.0 - 优化数据获取逻辑
+ */
+
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Calendar, Clock, BookOpen, FileText, ArrowRight, CheckCircle2 } from "lucide-react"
+import { Calendar, Clock, BookOpen, FileText, ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { useToast } from "@/components/ink-toast/toast-context"
+import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
+import { useDataCache } from "@/lib/hooks/use-data-cache"
+import { logger } from "@/lib/logger"
 
 export default function DashboardPage() {
   const { learningMode } = useLanguage()
   const toast = useToast()
-  const [user, setUser] = useState<any>(null)
+  const { user: authUser, isLoading: authLoading, refreshSession } = useAuth()
   const [greeting, setGreeting] = useState("")
-  const [isCheckedIn, setIsCheckedIn] = useState(false)
-  const [streakDays, setStreakDays] = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
-  const [stats, setStats] = useState({
-    timeSpent: 0,
-    wordsLearned: 0,
-    sentencesMastered: 0
-  })
-  const [isLoading, setIsLoading] = useState(true)
+  const [isCheckingIn, setIsCheckingIn] = useState(false)
 
   const t = TRANSLATIONS[learningMode]
 
+  // 设置问候语
   useEffect(() => {
     const hour = new Date().getHours()
     if (hour < 12) {
@@ -37,74 +42,90 @@ export default function DashboardPage() {
     }
   }, [t])
 
-  useEffect(() => {
-    const checkedIn = localStorage.getItem("inkwords_checked_in_today")
-    if (checkedIn) {
-      setIsCheckedIn(true)
-    }
-  }, [])
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const userStr = localStorage.getItem("inkwords_user")
-        const userData = userStr ? JSON.parse(userStr) : null
-
-        if (!userData?.email) {
-          console.error('用户邮箱不存在')
-          setIsLoading(false)
-          return
-        }
-
-        const response = await fetch('/api/user/me', {
-          headers: {
-            'x-user-email': userData.email
-          }
-        })
-        
+  // 使用数据缓存获取签到状态
+  const {
+    data: checkInData,
+    loading: isLoading,
+    refresh: refreshCheckIn
+  } = useDataCache<{ checked: boolean; streak: number }>({
+    key: 'checkin-status',
+    fetcher: async () => {
+      const response = await fetch('/api/checkin')
+      if (response.ok) {
         const data = await response.json()
-        
-        if (response.ok && data.user) {
-          setUser(data.user)
-          setStreakDays(data.user.streak || 0)
-          setStats({
-            timeSpent: data.user.points || 0,
-            wordsLearned: data.user.points || 0,
-            sentencesMastered: 0
-          })
+        return {
+          checked: data.checked,
+          streak: data.streak || 0
         }
-      } catch (error) {
-        console.error('获取用户数据失败:', error)
-      } finally {
-        setIsLoading(false)
       }
+      return { checked: false, streak: 0 }
+    },
+    expiresIn: 2 * 60 * 1000, // 2 分钟缓存
+    enabled: !!authUser && !authLoading, // 只在登录后启用
+  })
+
+  const isCheckedIn = checkInData?.checked || false
+  const streakDays = checkInData?.streak || 0
+
+  // 执行签到
+  const handleCheckIn = useCallback(async () => {
+    if (isCheckedIn || isCheckingIn) return
+
+    if (authLoading) {
+      return
     }
 
-    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true"
-    if (isLoggedIn) {
-      fetchUserData()
-    } else {
-      setIsLoading(false)
+    if (!authUser) {
+      toast.error('请先登录')
+      return
     }
-  }, [])
 
-  const handleCheckIn = () => {
-    if (isCheckedIn) return
-    setIsCheckedIn(true)
-    setStreakDays(streakDays + 1)
-    localStorage.setItem("inkwords_checked_in_today", "true")
-    localStorage.setItem("inkwords_streak_days", String(streakDays + 1))
-    setShowConfetti(true)
-    setTimeout(() => setShowConfetti(false), 3000)
-    toast.success(t.dashboard.checkIn.success)
+    try {
+      setIsCheckingIn(true)
+
+      const response = await fetch('/api/checkin', {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '签到失败')
+      }
+
+      const data = await response.json()
+
+      // 刷新签到状态
+      await refreshCheckIn()
+      setShowConfetti(true)
+
+      setTimeout(() => setShowConfetti(false), 3000)
+      toast.success(t.dashboard.checkIn.success)
+
+      // 刷新会话以更新用户积分
+      await refreshSession()
+
+    } catch (error: any) {
+      logger.error('签到失败:', error)
+      toast.error(error.message || '签到失败，请重试')
+    } finally {
+      setIsCheckingIn(false)
+    }
+  }, [isCheckedIn, isCheckingIn, authLoading, authUser, toast, t, refreshSession, refreshCheckIn])
+
+  const stats = {
+    timeSpent: authUser?.points || 0,
+    wordsLearned: authUser?.points || 0,
+    sentencesMastered: 0
   }
 
   return (
     <main className="min-h-screen">
-      <div 
+      <div
         className="fixed inset-0 z-0 bg-ink-paper ink-landscape-bg"
         aria-hidden="true"
       />
+
+      {/* 签到成功动画 */}
       <AnimatePresence>
         {showConfetti && (
           <motion.div
@@ -139,9 +160,11 @@ export default function DashboardPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-4xl mx-auto space-y-6">
-          
+
+          {/* 欢迎语 */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -149,13 +172,14 @@ export default function DashboardPage() {
             className="text-center"
           >
             <h1 className="font-serif text-4xl md:text-5xl text-ink-black font-semibold mb-3">
-              {greeting}
+              {greeting}{authUser?.name ? `，${authUser.name}` : ''}
             </h1>
             <p className="font-serif text-lg md:text-xl text-ink-gray/70">
               {learningMode === "LEARN_CHINESE" ? "今天也要继续加油哦！" : "Keep up the great work today!"}
             </p>
           </motion.div>
-          
+
+          {/* 签到卡片 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -176,7 +200,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-serif text-2xl font-bold text-[#C23E32]">
-                  {streakDays}
+                  {isLoading ? '-' : streakDays}
                 </span>
                 <span className="font-serif text-sm text-ink-gray/60">
                   {t.dashboard.checkIn.days}
@@ -186,25 +210,36 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCheckIn}
-              disabled={isCheckedIn}
+              disabled={isCheckedIn || isCheckingIn || isLoading || authLoading}
               className={cn(
-                "w-full mt-4 py-4 rounded-xl font-serif text-lg transition-all duration-300",
-                isCheckedIn
+                "w-full mt-4 py-4 rounded-xl font-serif text-lg transition-all duration-300 flex items-center justify-center gap-2",
+                isCheckedIn || authLoading
                   ? "bg-stone-100 text-stone-400 cursor-not-allowed"
                   : "bg-gradient-to-r from-[#C23E32] to-[#A8352B] text-white shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
               )}
             >
-              {isCheckedIn ? (
-                <div className="flex items-center justify-center gap-2">
+              {authLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  加载中...
+                </>
+              ) : isCheckingIn ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  {t.common.processing}
+                </>
+              ) : isCheckedIn ? (
+                <>
                   <CheckCircle2 className="w-5 h-5" strokeWidth={2} />
                   {t.dashboard.checkIn.checked}
-                </div>
+                </>
               ) : (
                 t.dashboard.checkIn.button
               )}
             </button>
           </motion.div>
-          
+
+          {/* 统计卡片 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -221,7 +256,7 @@ export default function DashboardPage() {
               >
                 <Clock className="w-8 h-8 text-[#C23E32] mx-auto mb-3" strokeWidth={1.5} />
                 <div className="font-serif text-3xl font-bold text-ink-black mb-1">
-                  {stats.timeSpent}
+                  {isLoading ? '-' : stats.timeSpent}
                 </div>
                 <div className="font-serif text-sm text-ink-gray/60">
                   {t.dashboard.stats.timeSpent}
@@ -233,7 +268,7 @@ export default function DashboardPage() {
               >
                 <BookOpen className="w-8 h-8 text-[#C23E32] mx-auto mb-3" strokeWidth={1.5} />
                 <div className="font-serif text-3xl font-bold text-ink-black mb-1">
-                  {stats.wordsLearned}
+                  {isLoading ? '-' : stats.wordsLearned}
                 </div>
                 <div className="font-serif text-sm text-ink-gray/60">
                   {t.dashboard.stats.wordsLearned}
@@ -245,7 +280,7 @@ export default function DashboardPage() {
               >
                 <FileText className="w-8 h-8 text-[#C23E32] mx-auto mb-3" strokeWidth={1.5} />
                 <div className="font-serif text-3xl font-bold text-ink-black mb-1">
-                  {stats.sentencesMastered}
+                  {isLoading ? '-' : stats.sentencesMastered}
                 </div>
                 <div className="font-serif text-sm text-ink-gray/60">
                   {t.dashboard.stats.sentencesMastered}
@@ -253,7 +288,8 @@ export default function DashboardPage() {
               </motion.div>
             </div>
           </motion.div>
-          
+
+          {/* 开始练习按钮 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 查询用户信息
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('id, email, stripe_customer_id')
