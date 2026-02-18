@@ -393,8 +393,14 @@ function StudyPageContent() {
     // 记录学习活动（只有在回答正确后才记录）
     if (feedbackStatus === 'correct') {
       try {
-        await recordStudy(1)
-        logger.log('学习记录已更新')
+        // 【修复】传递 userId 给 recordStudy
+        const userId = getUserId()
+        if (userId) {
+          await recordStudy(1, userId)
+          logger.log('学习记录已更新')
+        } else {
+          logger.warn('用户未登录，跳过学习记录更新')
+        }
       } catch (error) {
         logger.error('更新学习记录失败:', error)
       }
@@ -411,7 +417,7 @@ function StudyPageContent() {
         isNavigating.current = false
       }, 500)
     }
-  }, [currentIndex, totalItems, feedbackStatus])
+  }, [currentIndex, totalItems, feedbackStatus, getUserId])
 
   // 检查答案
   const handleCheck = useCallback(() => {
@@ -559,6 +565,35 @@ function StudyPageContent() {
   }, [mode, currentItem, feedbackStatus, handleNext, handleCheck])
 
   // 【关键修复】播放语音 - 添加预加载和错误处理
+  // 【修复】音频播放相关状态
+  const [voicesLoaded, setVoicesLoaded] = useState(false)
+  
+  // 【修复】预加载语音列表
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) {
+      logger.warn('浏览器不支持语音合成')
+      return
+    }
+    
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        setVoicesLoaded(true)
+        logger.log('语音列表已加载:', voices.length)
+      }
+    }
+    
+    // 立即尝试加载
+    loadVoices()
+    
+    // 监听语音列表变化事件（Chrome 需要）
+    window.speechSynthesis.onvoiceschanged = loadVoices
+    
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null
+    }
+  }, [])
+
   const handlePlay = () => {
     if (!currentItem) return
     
@@ -583,23 +618,27 @@ function StudyPageContent() {
     }
     
     try {
-      // 停止之前的播放
-      window.speechSynthesis.cancel()
-      
-      // Chrome 浏览器需要 resume
+      // 【修复】强制恢复音频上下文（解决浏览器自动播放策略）
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume()
       }
+      
+      // 【修复】取消之前的播放
+      window.speechSynthesis.cancel()
       
       const utterance = new SpeechSynthesisUtterance(text)
       const langCode = isLearnChinese ? 'zh-CN' : 'en-US'
       utterance.lang = langCode
       
-      // 【关键修复】获取最佳语音
+      // 【修复】获取最佳语音 - 等待语音列表加载
       const voices = window.speechSynthesis.getVoices()
-      const bestVoice = voices.find(v => v.lang === langCode)
+      const bestVoice = voices.find(v => v.lang === langCode) || 
+                        voices.find(v => v.lang.startsWith(isLearnChinese ? 'zh' : 'en'))
       if (bestVoice) {
         utterance.voice = bestVoice
+        logger.log('使用语音:', bestVoice.name)
+      } else {
+        logger.warn('未找到合适的语音，使用默认语音')
       }
       
       utterance.rate = 0.9
@@ -618,7 +657,7 @@ function StudyPageContent() {
       }
       
       utterance.onerror = (event) => {
-        // 【关键修复】处理 interrupted 错误
+        // 处理 interrupted 错误
         if (event.error === 'interrupted' || event.error === 'canceled') {
           logger.log('播放被中断（正常行为）')
         } else {
@@ -627,15 +666,8 @@ function StudyPageContent() {
         setIsPlaying(false)
       }
       
-      // 【关键修复】使用 setTimeout 确保在用户交互上下文中执行
-      setTimeout(() => {
-        try {
-          window.speechSynthesis.speak(utterance)
-        } catch (error) {
-          logger.error('播放失败:', error)
-          setIsPlaying(false)
-        }
-      }, 10)
+      // 【修复】直接播放，不使用 setTimeout
+      window.speechSynthesis.speak(utterance)
     } catch (error) {
       logger.error('播放失败:', error)
       setIsPlaying(false)
@@ -891,25 +923,24 @@ function StudyPageContent() {
                             {/* 拼音输入框 */}
                             <div className="flex items-center gap-3">
                               {wordInputs.map((value, index) => {
-                                // 提示显示拼音
-                                const hintText = wordPinyinArray[index] || ''
-                                // 当用户未输入且未显示提示时，显示下划线作为暗示
-                                const displayValue = showHint ? hintText : (value || '_')
-                                
+                                // 【修复】输入框始终显示用户输入的值，不显示提示答案
+                                // 提示答案现在只在下方的 Word Details 区域显示
+                                const inputDisplayValue = value || ''
+
                                 return (
                                   <input
                                     key={index}
                                     id={`pinyin-input-${index}`}
                                     ref={el => { wordInputRefs.current[index] = el }}
                                     type="text"
-                                    value={showHint ? hintText : value}
+                                    value={inputDisplayValue}
                                     onChange={(e) => handleWordInputChange(index, e.target.value)}
                                     onKeyDown={(e) => {
                                       // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
                                       if (e.key === 'Enter') {
                                         e.stopPropagation() // 🛑 关键！阻止事件传给 Window
                                         e.preventDefault()  // 🛑 阻止默认行为
-                                        
+
                                         if (feedbackStatus === 'correct') {
                                           handleNext()
                                         } else {
@@ -917,21 +948,21 @@ function StudyPageContent() {
                                         }
                                         return // 结束执行
                                       }
-                                      
+
                                       // 原有的空格键跳转逻辑保持不变
                                       if (e.key === ' ' && index < wordInputs.length - 1) {
                                         e.preventDefault()
                                         const nextInput = document.getElementById(`pinyin-input-${index + 1}`)
                                         if (nextInput) nextInput.focus()
                                       }
-                                      
+
                                       // 原有的 Backspace 逻辑保持不变
                                       if (e.key === 'Backspace' && !value && index > 0) {
                                         const prevInput = document.getElementById(`pinyin-input-${index - 1}`)
                                         if (prevInput) prevInput.focus()
                                       }
                                     }}
-                                    readOnly={showHint || feedbackStatus === 'correct'}
+                                    readOnly={feedbackStatus === 'correct'}
                                     className={`
                                       w-20 h-14 text-xl font-serif
                                       border-0 border-b-2 rounded-none bg-transparent
@@ -943,7 +974,7 @@ function StudyPageContent() {
                                         : "border-red-500 text-red-500 focus:border-red-600"
                                       }
                                     `}
-                                    placeholder={!showHint && !value ? '_' : ''}
+                                    placeholder="_"
                                   />
                                 )
                               })}
@@ -1038,14 +1069,14 @@ function StudyPageContent() {
                             <input
                               ref={el => { wordInputRefs.current[0] = el }}
                               type="text"
-                              value={showHint ? (currentItem as WordItem).word : wordInputs[0]}
+                              value={wordInputs[0] || ''}
                               onChange={(e) => handleWordInputChange(0, e.target.value)}
                               onKeyDown={(e) => {
                                 // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
                                 if (e.key === 'Enter') {
                                   e.stopPropagation() // 🛑 关键！阻止事件传给 Window
                                   e.preventDefault()  // 🛑 阻止默认行为
-                                  
+
                                   if (feedbackStatus === 'correct') {
                                     handleNext()
                                   } else {
@@ -1054,7 +1085,7 @@ function StudyPageContent() {
                                   return // 结束执行
                                 }
                               }}
-                              readOnly={showHint || feedbackStatus === 'correct'}
+                              readOnly={feedbackStatus === 'correct'}
                               className={`
                                 w-full max-w-md h-16 text-2xl font-serif tracking-wide
                                 border-0 border-b-2 rounded-none bg-transparent
@@ -1191,22 +1222,23 @@ function StudyPageContent() {
                           <div className="flex items-center justify-center gap-6 mb-6 flex-wrap">
                             {/* 拼音输入框 */}
                             {sentenceInputs.map((value, index) => {
-                              const hintText = sentencePinyinArray?.[index] || ''
-                              
+                              // 【修复】输入框始终显示用户输入的值，不显示提示答案
+                              const inputDisplayValue = value || ''
+
                               return (
                                 <input
                                   key={index}
                                   id={`sentence-pinyin-input-${index}`}
                                   ref={el => { sentenceInputRefs.current[index] = el }}
                                   type="text"
-                                  value={showHint ? hintText : value}
+                                  value={inputDisplayValue}
                                   onChange={(e) => handleSentenceInputChange(index, e.target.value)}
                                   onKeyDown={(e) => {
                                     // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
                                     if (e.key === 'Enter') {
                                       e.stopPropagation() // 🛑 关键！阻止事件传给 Window
                                       e.preventDefault()  // 🛑 阻止默认行为
-                                      
+
                                       if (feedbackStatus === 'correct') {
                                         handleNext()
                                       } else {
@@ -1214,21 +1246,21 @@ function StudyPageContent() {
                                       }
                                       return // 结束执行
                                     }
-                                    
+
                                     // 原有的空格键跳转逻辑保持不变
                                     if (e.key === ' ' && index < sentenceInputs.length - 1) {
                                       e.preventDefault()
                                       const nextInput = document.getElementById(`sentence-pinyin-input-${index + 1}`)
                                       if (nextInput) nextInput.focus()
                                     }
-                                    
+
                                     // 原有的 Backspace 逻辑保持不变
                                     if (e.key === 'Backspace' && !value && index > 0) {
                                       const prevInput = document.getElementById(`sentence-pinyin-input-${index - 1}`)
                                       if (prevInput) prevInput.focus()
                                     }
                                   }}
-                                  readOnly={showHint || feedbackStatus === 'correct'}
+                                  readOnly={feedbackStatus === 'correct'}
                                   className={`
                                     w-20 h-14 text-xl font-serif
                                     border-0 border-b-2 rounded-none bg-transparent
@@ -1240,11 +1272,11 @@ function StudyPageContent() {
                                       : "border-red-500 text-red-500 focus:border-red-600"
                                     }
                                   `}
-                                  placeholder={!showHint && !value ? '_' : ''}
+                                  placeholder="_"
                                 />
                               )
                             })}
-                            
+
                             {/* 提示按钮 */}
                             <button
                               onClick={() => setShowHint(!showHint)}
@@ -1318,25 +1350,25 @@ function StudyPageContent() {
                                 const correctWord = tokens?.[index] || ''
                                 const hasError = inputErrors[index] && value.length > 0
                                 const isCorrect = feedbackStatus === 'correct'
-                                
+
                                 // 【优化】根据单词长度精确计算宽度，每个字符约 14px，加上 padding
                                 const charWidth = 14
                                 const padding = 16
                                 const minWidth = Math.max(50, correctWord.length * charWidth + padding)
-                                
+
                                 return (
                                   <div key={index} className="relative flex flex-col items-center">
                                     <input
                                       ref={el => { sentenceInputRefs.current[index] = el }}
                                       type="text"
-                                      value={showHint ? correctWord : value}
+                                      value={value || ''}
                                       onChange={(e) => handleSentenceInputChange(index, e.target.value)}
                                       onKeyDown={(e) => {
                                         // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
                                         if (e.key === 'Enter') {
                                           e.stopPropagation()
                                           e.preventDefault()
-                                          
+
                                           if (feedbackStatus === 'correct') {
                                             handleNext()
                                           } else if (index === sentenceInputs.length - 1) {
@@ -1344,19 +1376,19 @@ function StudyPageContent() {
                                           }
                                           return
                                         }
-                                        
+
                                         // 原有的空格键跳转逻辑保持不变
                                         if (e.key === ' ' && index < sentenceInputs.length - 1) {
                                           e.preventDefault()
                                           sentenceInputRefs.current[index + 1]?.focus()
                                         }
-                                        
+
                                         // 原有的 Backspace 逻辑保持不变
                                         if (e.key === 'Backspace' && !value && index > 0) {
                                           sentenceInputRefs.current[index - 1]?.focus()
                                         }
                                       }}
-                                      readOnly={showHint || isCorrect}
+                                      readOnly={isCorrect}
                                       style={{ width: `${minWidth}px` }}
                                       className={`
                                         h-12 text-lg font-serif px-2

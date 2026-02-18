@@ -9,7 +9,7 @@ import { useToast } from "@/components/ink-toast/toast-context"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
-import GumroadButton from "@/components/GumroadButton"
+import PayPalCheckoutButton from "@/components/PayPalCheckoutButton"
 
 type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 
@@ -22,6 +22,7 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
  * - VIP 状态显示和到期时间
  * - 设置列表
  * - 退出登录
+ * - PayPal 支付开通 VIP
  */
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile")
@@ -46,23 +47,25 @@ export default function ProfilePage() {
 
   return (
     <>
-      <div 
+      <div
         className="fixed inset-0 z-0 bg-ink-paper ink-landscape-bg"
         aria-hidden="true"
       />
-      
+
       <main className="relative z-10 min-h-screen overflow-y-auto">
         <div className="pb-24">
           <div className="w-full max-w-2xl mx-auto">
             <ProfileHeader />
-            
+
             {/* VIP Banner - 已登录用户显示升级按钮或VIP状态 */}
             {user?.id && !isVip ? (
               <div className="w-full px-4 mb-4">
-                {/* TODO: 请替换为实际的 Gumroad 产品链接 */}
-                <GumroadButton userId={user.id} className="w-full">
-                  开通 Pro 会员
-                </GumroadButton>
+                {/* PayPal 支付按钮 - 开通 VIP */}
+                <div className="bg-white rounded-2xl shadow-sm p-4">
+                  <h3 className="text-lg font-medium text-center mb-2">开通 Pro 会员</h3>
+                  <p className="text-sm text-gray-500 text-center mb-4">仅需 $4.99，享受全部 VIP 特权</p>
+                  <PayPalCheckoutButton userId={user.id} price="4.99" />
+                </div>
               </div>
             ) : (
               <div className="w-full cursor-pointer">
