@@ -61,26 +61,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 /**
  * VIP 判定辅助函数（大小写不敏感）
- * 同时检查 subscription_status 和 current_period_end（到期时间）
+ * 检查 is_pro 字段、subscription_status 和 current_period_end（到期时间）
  */
 export function checkIsVip(
   subscriptionStatus: string | null | undefined,
-  currentPeriodEnd: string | null | undefined = null
+  currentPeriodEnd: string | null | undefined = null,
+  isPro: boolean | null | undefined = false
 ): boolean {
+  // 如果 is_pro 为 true，直接判定为 VIP
+  if (isPro) {
+    return true
+  }
+
   const vipStatuses = ['yearly', 'monthly', 'active', 'pro']
   const hasValidStatus = vipStatuses.includes((subscriptionStatus || '').toLowerCase())
-  
+
   if (!hasValidStatus) {
     return false
   }
-  
+
   // 检查会员是否已过期
   if (currentPeriodEnd) {
     const expiryDate = new Date(currentPeriodEnd)
     const now = new Date()
     return expiryDate > now
   }
-  
+
   // 如果没有设置到期时间，视为有效会员
   return true
 }
@@ -343,7 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoading = authState.status === 'loading'
   const isAuthenticated = authState.status === 'authenticated'
   const user = authState.user
-  const isVip = checkIsVip(user?.subscription_status, user?.current_period_end)
+  const isVip = checkIsVip(user?.subscription_status, user?.current_period_end, user?.is_pro)
 
   // ============================================================================
   // 渲染

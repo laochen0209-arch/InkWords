@@ -73,7 +73,7 @@ function createSupabaseAdmin() {
 
 /**
  * 更新用户 VIP 状态
- * 使用 Supabase Admin 客户端更新用户 is_vip 字段
+ * 使用 Supabase Admin 客户端更新用户 is_pro 字段
  *
  * @param userId 用户 ID
  */
@@ -82,11 +82,11 @@ async function updateUserVipStatus(userId: string): Promise<void> {
 
   const supabaseAdmin = createSupabaseAdmin();
 
-  // 更新用户 is_vip 字段为 true
+  // 更新用户 is_pro 字段为 true
   const { error } = await supabaseAdmin
     .from("users")
     .update({
-      is_vip: true,
+      is_pro: true,
       subscription_status: "active",
       updated_at: new Date().toISOString(),
     })

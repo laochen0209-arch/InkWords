@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('users')
       .update({
-        is_vip: true,
+        is_pro: true,
         subscription_status: 'active',
         subscription_type: 'yearly',
         current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       message: 'VIP 权益已激活',
       data: {
         user_id: user.id,
-        is_vip: true,
+        is_pro: true,
         subscription_status: 'yearly',
         points: 8888
       }
