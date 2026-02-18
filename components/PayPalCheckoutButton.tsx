@@ -130,7 +130,7 @@ export default function PayPalCheckoutButton({
   /**
    * 支付错误回调
    */
-  const onError = (err: Error) => {
+  const onError = (err: Record<string, unknown>) => {
     console.error("[PayPal] 支付出错:", err);
     toast.error("支付出错，请重试或联系客服");
   };
