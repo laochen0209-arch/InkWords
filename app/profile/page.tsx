@@ -10,7 +10,7 @@ import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import PayPalCheckoutButton from "@/components/PayPalCheckoutButton"
-import { Check } from "lucide-react"
+import { Check, Crown, Sparkles, BookOpen, Library, Award } from "lucide-react"
 
 type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 type PlanType = "monthly" | "yearly"
@@ -51,6 +51,14 @@ export default function ProfilePage() {
     },
   }
 
+  // VIP 特权列表
+  const vipBenefits = [
+    { icon: BookOpen, text: "无限学习单词和句子" },
+    { icon: Library, text: "解锁所有图书馆资源" },
+    { icon: Award, text: "专属练习模式和考试" },
+    { icon: Sparkles, text: "优先客服支持" },
+  ]
+
   const handleLogout = () => {
     if (confirm(t.auth.logoutConfirm)) {
       localStorage.removeItem("isLoggedIn")
@@ -79,61 +87,103 @@ export default function ProfilePage() {
             {/* VIP Banner - 已登录用户显示升级按钮或VIP状态 */}
             {user?.id && !isVip ? (
               <div className="w-full px-4 mb-4">
-                {/* PayPal 支付按钮 - 开通 VIP */}
-                <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <h3 className="text-lg font-medium text-center mb-2">开通 Pro 会员</h3>
-                  <p className="text-sm text-gray-500 text-center mb-4">选择适合您的套餐，享受全部 VIP 特权</p>
+                {/* VIP 开通区域 - 水墨风格 */}
+                <div className="relative overflow-hidden rounded-2xl shadow-lg">
+                  {/* 背景装饰 */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#2B2B2B] via-[#3D3D3D] to-[#2B2B2B]" />
                   
-                  {/* 套餐选择卡片 */}
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    {/* 月度套餐 */}
-                    <button
-                      onClick={() => setSelectedPlan("monthly")}
-                      className={`relative p-4 rounded-xl border-2 transition-all ${
-                        selectedPlan === "monthly"
-                          ? "border-[#C23E32] bg-red-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="font-medium text-gray-900">{plans.monthly.label}</div>
-                        <div className="text-lg font-bold text-[#C23E32] mt-1">{plans.monthly.subLabel}</div>
-                      </div>
-                      {selectedPlan === "monthly" && (
-                        <div className="absolute top-2 right-2 w-5 h-5 bg-[#C23E32] rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-
-                    {/* 年度套餐 */}
-                    <button
-                      onClick={() => setSelectedPlan("yearly")}
-                      className={`relative p-4 rounded-xl border-2 transition-all ${
-                        selectedPlan === "yearly"
-                          ? "border-[#C23E32] bg-red-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="font-medium text-gray-900">{plans.yearly.label}</div>
-                        <div className="text-lg font-bold text-[#C23E32] mt-1">{plans.yearly.subLabel}</div>
-                        {plans.yearly.savings && (
-                          <div className="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-600 text-xs rounded-full font-medium">
-                            🔥 {plans.yearly.savings}
-                          </div>
-                        )}
-                      </div>
-                      {selectedPlan === "yearly" && (
-                        <div className="absolute top-2 right-2 w-5 h-5 bg-[#C23E32] rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </button>
+                  {/* 云纹装饰 */}
+                  <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
+                    <svg viewBox="0 0 100 100" fill="none" className="w-full h-full">
+                      <path d="M20 60 Q30 40 50 50 Q70 60 80 40" stroke="#D4AF37" strokeWidth="2" fill="none" />
+                      <path d="M10 75 Q25 55 45 65" stroke="#D4AF37" strokeWidth="1.5" fill="none" />
+                    </svg>
                   </div>
 
-                  {/* PayPal 支付按钮 */}
-                  <PayPalCheckoutButton userId={user.id} price={plans[selectedPlan].price} />
+                  <div className="relative z-10 p-6">
+                    {/* 标题区域 */}
+                    <div className="text-center mb-6">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#D4AF37]/20 mb-3">
+                        <Crown className="w-8 h-8 text-[#D4AF37]" />
+                      </div>
+                      <h3 className="text-xl font-serif font-medium text-[#FDFBF7] mb-1">
+                        开通 Pro 会员
+                      </h3>
+                      <p className="text-sm text-[#FDFBF7]/60">
+                        解锁全部特权，畅享学习之旅
+                      </p>
+                    </div>
+
+                    {/* VIP 特权列表 */}
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      {vipBenefits.map((benefit, index) => (
+                        <div key={index} className="flex items-center gap-2 text-[#FDFBF7]/80 text-sm">
+                          <benefit.icon className="w-4 h-4 text-[#D4AF37]" />
+                          <span>{benefit.text}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 套餐选择卡片 */}
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      {/* 月度套餐 */}
+                      <button
+                        onClick={() => setSelectedPlan("monthly")}
+                        className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
+                          selectedPlan === "monthly"
+                            ? "border-[#D4AF37] bg-[#D4AF37]/10"
+                            : "border-[#FDFBF7]/20 hover:border-[#FDFBF7]/40 bg-[#FDFBF7]/5"
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="font-medium text-[#FDFBF7] text-sm mb-1">{plans.monthly.label}</div>
+                          <div className="text-2xl font-bold text-[#D4AF37]">{plans.monthly.price}</div>
+                          <div className="text-xs text-[#FDFBF7]/60">USD/月</div>
+                        </div>
+                        {selectedPlan === "monthly" && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#D4AF37] rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-[#2B2B2B]" />
+                          </div>
+                        )}
+                      </button>
+
+                      {/* 年度套餐 */}
+                      <button
+                        onClick={() => setSelectedPlan("yearly")}
+                        className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
+                          selectedPlan === "yearly"
+                            ? "border-[#D4AF37] bg-[#D4AF37]/10"
+                            : "border-[#FDFBF7]/20 hover:border-[#FDFBF7]/40 bg-[#FDFBF7]/5"
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="font-medium text-[#FDFBF7] text-sm mb-1">{plans.yearly.label}</div>
+                          <div className="text-2xl font-bold text-[#D4AF37]">{plans.yearly.price}</div>
+                          <div className="text-xs text-[#FDFBF7]/60">USD/年</div>
+                          {plans.yearly.savings && (
+                            <div className="inline-block mt-2 px-2 py-0.5 bg-[#D4AF37]/20 text-[#D4AF37] text-xs rounded-full font-medium">
+                              🔥 {plans.yearly.savings}
+                            </div>
+                          )}
+                        </div>
+                        {selectedPlan === "yearly" && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#D4AF37] rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-[#2B2B2B]" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* PayPal 支付按钮 */}
+                    <div className="bg-white/5 rounded-xl p-4">
+                      <PayPalCheckoutButton userId={user.id} price={plans[selectedPlan].price} />
+                    </div>
+
+                    {/* 安全提示 */}
+                    <p className="text-center text-xs text-[#FDFBF7]/40 mt-4">
+                      安全支付 · 随时取消 · 7天无理由退款
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
