@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
 import { ProfileHeader } from "@/components/profile/profile-header"
 import { VipBanner } from "@/components/profile/vip-banner"
@@ -29,11 +29,21 @@ type PlanType = "monthly" | "yearly"
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile")
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("monthly")
+  const [debugInfo, setDebugInfo] = useState<string>("")
   const toast = useToast()
   const { learningMode } = useLanguage()
   const { user, isVip, isAuthenticated } = useAuth()
 
   const t = TRANSLATIONS[learningMode]
+
+  // 【调试】输出用户信息
+  useEffect(() => {
+    console.log("[Profile Debug] user:", user)
+    console.log("[Profile Debug] isVip:", isVip)
+    console.log("[Profile Debug] user?.is_pro:", user?.is_pro)
+    console.log("[Profile Debug] user?.subscription_status:", user?.subscription_status)
+    setDebugInfo(`isVip=${isVip}, is_pro=${user?.is_pro}, status=${user?.subscription_status}`)
+  }, [user, isVip])
 
   // 套餐配置
   const plans = {
@@ -83,6 +93,15 @@ export default function ProfilePage() {
         <div className="pb-24">
           <div className="w-full max-w-2xl mx-auto">
             <ProfileHeader />
+
+            {/* 【调试】显示 VIP 状态信息 */}
+            {user?.id && (
+              <div className="w-full px-4 mb-2">
+                <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-2 text-xs text-yellow-800">
+                  <strong>DEBUG:</strong> {debugInfo}
+                </div>
+              </div>
+            )}
 
             {/* VIP Banner - 已登录用户显示升级按钮或VIP状态 */}
             {user?.id && !isVip ? (
