@@ -40,7 +40,7 @@ interface LanguageProviderProps {
 export function LanguageProvider({ children }: LanguageProviderProps) {
   const [learningMode, setLearningMode] = useState<LearningMode>("LEARN_ENGLISH")
   const [nativeLang, setNativeLang] = useState<NativeLang>("en")
-  const [targetLang, setTargetLang] = useState<TargetLang>(zh")
+  const [targetLang, setTargetLang] = useState<TargetLang>("zh")
   const [uiLanguage, setUiLanguage] = useState<NativeLang>("en")
 
   /**
