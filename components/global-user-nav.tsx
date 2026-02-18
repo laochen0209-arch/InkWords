@@ -11,8 +11,10 @@ export function UserGlobalNav() {
   const { user, isLoading } = useAuth()
 
   // 扩大 VIP 判定范围，防止漏判
-  const isVip = user && ['yearly', 'monthly', 'active', 'pro'].includes(
-    (user.subscription_status || '').toLowerCase()
+  // 【修复】同时检查 is_pro 字段
+  const isVip = user && (
+    user.is_pro ||
+    ['yearly', 'monthly', 'active', 'pro'].includes((user.subscription_status || '').toLowerCase())
   )
 
   // 核心显示逻辑 - 严格按照优先级读取数据

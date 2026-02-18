@@ -117,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * 缓存用户资料到 localStorage
+   * 【修复】添加 is_pro 字段到缓存
    */
   const cacheUserProfile = (user: User) => {
     if (typeof window === 'undefined') return
@@ -126,7 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         current_period_end: user.current_period_end,
         points: user.points,
         practice_tickets: user.practice_tickets,
-        streak: user.streak
+        streak: user.streak,
+        is_pro: user.is_pro
       }))
     } catch {
       // 忽略存储错误
@@ -136,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * 从会话创建基础用户数据（快速响应）
    * 【修复】使用 localStorage 缓存的 VIP 状态避免闪烁
+   * 【修复】添加 is_pro 字段
    */
   const createBaseUser = (authUser: any): User => {
     const cached = getCachedUserProfile()
@@ -150,7 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       study_daily_count: 0,
       library_daily_count: 0,
       practice_tickets: cached?.practice_tickets || 0,
-      streak: cached?.streak || 0
+      streak: cached?.streak || 0,
+      is_pro: cached?.is_pro || false
     }
   }
 
@@ -168,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data: userData, error } = await supabase
         .from("users")
-        .select("name, avatar, subscription_status, points, current_period_end, study_daily_count, library_daily_count, practice_tickets, streak")
+        .select("name, avatar, subscription_status, points, current_period_end, study_daily_count, library_daily_count, practice_tickets, streak, is_pro")
         .eq("id", authUser.id)
         .single()
 
@@ -188,7 +192,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         study_daily_count: userData?.study_daily_count || 0,
         library_daily_count: userData?.library_daily_count || 0,
         practice_tickets: userData?.practice_tickets || 0,
-        streak: userData?.streak || 0
+        streak: userData?.streak || 0,
+        is_pro: userData?.is_pro || false
       }
 
       cache.set(cacheKey, user, 30000)

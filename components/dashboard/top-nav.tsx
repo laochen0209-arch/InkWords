@@ -28,7 +28,11 @@ export function TopNav({ points = 320 }: TopNavProps) {
   const { user, isLoading } = useAuth()
 
   // 真实的 VIP 判断逻辑
-  const isVip = user && ['yearly', 'monthly', 'active'].includes(user.subscription_status || '')
+  // 【修复】同时检查 is_pro 字段
+  const isVip = user && (
+    user.is_pro ||
+    ['yearly', 'monthly', 'active', 'pro'].includes(user.subscription_status || '')
+  )
 
   // 获取真实显示名称
   const displayName = user?.name || user?.email?.split('@')[0] || '墨语学习者'
