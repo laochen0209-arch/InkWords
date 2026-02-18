@@ -136,7 +136,7 @@ async function updateUserVipStatus(
   
   const { error } = await supabase
     .from('users')
-    .update(updateData)
+    .update(updateData as any)
     .eq('id', userId)
   
   if (error) {
