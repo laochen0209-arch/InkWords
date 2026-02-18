@@ -33,6 +33,7 @@ interface User {
   library_daily_count: number
   practice_tickets: number
   streak: number
+  is_pro?: boolean
 }
 
 interface AuthContextType {
