@@ -3,6 +3,7 @@
 import { Crown } from "lucide-react"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { useDataRefresh } from "@/lib/contexts/data-refresh-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { NativeLang } from "@/lib/language-utils"
 import { useEffect, useState, useRef, useCallback } from "react"
@@ -26,6 +27,7 @@ interface ProfileHeaderProps {
  * - 显示用户名和ID
  * - 显示学习统计数据（从数据库获取真实数据）
  * - VIP 用户显示皇冠标识
+ * - 支持实时数据刷新
  *
  * 注意：LEARN_ENGLISH = 中文界面（学英语的中文用户）
  *       LEARN_CHINESE = 英文界面（学中文的英文用户）
@@ -33,6 +35,7 @@ interface ProfileHeaderProps {
 export function ProfileHeader({ nativeLang = "zh" }: ProfileHeaderProps) {
   const { user, isVip, refreshUserStats } = useAuth()
   const { learningMode } = useLanguage()
+  const { refreshTrigger } = useDataRefresh()
   const [wordsLearned, setWordsLearned] = useState(0)
   const [accuracy, setAccuracy] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -169,6 +172,15 @@ export function ProfileHeader({ nativeLang = "zh" }: ProfileHeaderProps) {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [user?.id, fetchUserStats, refreshUserStats])
+
+  // 【新增】监听全局数据刷新事件
+  useEffect(() => {
+    if (user?.id && refreshTrigger > 0) {
+      console.log('[ProfileHeader] 检测到数据刷新事件，正在更新统计数据...')
+      fetchUserStats()
+      refreshUserStats()
+    }
+  }, [refreshTrigger, user?.id, fetchUserStats, refreshUserStats])
 
   // 判断是否为中文界面 - 【修复】移到 stats 数组之前，避免暂时性死区错误
   const isChineseUI = learningMode === "LEARN_ENGLISH"

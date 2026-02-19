@@ -18,6 +18,7 @@ import { ArrowLeft, Volume2, X, Check, RotateCcw, Eye, EyeOff } from "lucide-rea
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useLanguage } from "@/lib/contexts/language-context"
+import { useDataRefresh } from "@/lib/contexts/data-refresh-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
 import { UpgradeModal } from "@/components/upgrade/upgrade-modal"
@@ -72,6 +73,7 @@ function StudyPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { learningMode, targetLang } = useLanguage()
+  const { triggerRefresh } = useDataRefresh()
   const t = TRANSLATIONS[learningMode]
 
   // 从 URL 或 LocalStorage 获取初始状态
@@ -422,6 +424,10 @@ function StudyPageContent() {
             }
           )
           logger.log('学习活动已记录到 user_activities')
+          
+          // 【新增】触发全局数据刷新，让 dashboard 和 profile 页面显示最新数据
+          triggerRefresh()
+          logger.log('已触发全局数据刷新')
         } else {
           logger.warn('用户未登录，跳过学习记录更新')
         }
@@ -441,7 +447,7 @@ function StudyPageContent() {
         isNavigating.current = false
       }, 500)
     }
-  }, [currentIndex, totalItems, feedbackStatus, getUserId])
+  }, [currentIndex, totalItems, feedbackStatus, getUserId, triggerRefresh])
 
   // 检查答案
   const handleCheck = useCallback(() => {

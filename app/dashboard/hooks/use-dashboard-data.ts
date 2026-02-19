@@ -5,8 +5,10 @@
  * @date 2026-02-04
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createBrowserClient } from '@/lib/supabase/client'
+import { useDataRefresh } from '@/lib/contexts/data-refresh-context'
+import { useAuth } from '@/lib/contexts/auth-context'
 
 /**
  * 用户活动记录接口
@@ -49,6 +51,7 @@ export interface RadarData {
 
 /**
  * 使用用户数据中心数据的 Hook
+ * 支持实时刷新，配合 useDataRefresh 使用
  * @returns 统计数据、活动记录、加载状态等
  */
 export function useDashboardData() {
@@ -64,17 +67,18 @@ export function useDashboardData() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
-  
-  // 使用 ref 防止重复获取数据
-  const dataFetchedRef = useRef(false)
 
   const supabase = createBrowserClient()
+  const { refreshTrigger } = useDataRefresh()
+  const { user, isAuthenticated } = useAuth()
 
   /**
    * 获取仪表板数据
+   * 从数据库获取最新的用户学习数据和活动记录
    */
-  const fetchDashboardData = useCallback(async (user: any) => {
+  const fetchDashboardData = useCallback(async (currentUser: any) => {
     try {
+      console.log('[useDashboardData] 开始获取数据...')
       setLoading(true)
       setError(null)
 
@@ -82,25 +86,27 @@ export function useDashboardData() {
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('study_daily_count, library_daily_count, practice_tickets, last_reset_date, created_at')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .single()
 
       if (userError) {
-        console.warn('获取用户数据失败:', userError)
+        console.warn('[useDashboardData] 获取用户数据失败:', userError)
       }
 
-      // 获取用户活动记录
+      // 获取用户活动记录（最多 100 条）
       const { data: activitiesData, error: activitiesError } = await supabase
         .from('user_activities')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
+        .limit(100)
 
       if (activitiesError) {
-        console.warn('获取活动记录失败:', activitiesError)
+        console.warn('[useDashboardData] 获取活动记录失败:', activitiesError)
       }
 
       const activitiesList = activitiesData || []
+      console.log('[useDashboardData] 获取到', activitiesList.length, '条活动记录')
       setActivities(activitiesList)
 
       // 计算统计数据
@@ -111,13 +117,15 @@ export function useDashboardData() {
 
       // 生成雷达图数据
       generateRadarData(activitiesList)
+
+      console.log('[useDashboardData] 数据获取完成')
     } catch (err: any) {
       // 忽略请求取消错误
       if (err?.name === 'AbortError' || err?.message?.includes('aborted')) {
-        console.log('[Dashboard] 请求被取消')
+        console.log('[useDashboardData] 请求被取消')
         return
       }
-      console.error('获取用户活动数据失败:', err)
+      console.error('[useDashboardData] 获取用户活动数据失败:', err)
       setError('获取数据失败，请稍后重试')
     } finally {
       setLoading(false)
@@ -126,54 +134,26 @@ export function useDashboardData() {
   }, [supabase])
 
   /**
-   * 初始化数据获取 - 使用监听模式
+   * 监听数据刷新事件和用户登录状态
+   * 当 refreshTrigger 变化或用户登录状态改变时，自动刷新数据
    */
   useEffect(() => {
-    let mounted = true
-    let authSubscription: { unsubscribe: () => void } | null = null
-
-    const initData = async () => {
-      // 1. 先获取 session，给它一点时间
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        // 如果没拿到，不要急着报错，监听状态变化
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (_event, session) => {
-            if (session && mounted && !dataFetchedRef.current) {
-              // 只有真的拿到 session 了，才去 fetch 数据
-              dataFetchedRef.current = true
-              fetchDashboardData(session.user)
-            }
-          }
-        )
-        authSubscription = subscription
-        // 设置一个超时，如果 10 秒后还没拿到 session，显示错误
-        setTimeout(() => {
-          if (mounted && !dataFetchedRef.current) {
-            setError('用户未登录')
-            setLoading(false)
-            setIsInitialized(true)
-          }
-        }, 10000)
-      } else {
-        // 如果直接拿到了，就正常加载
-        if (!dataFetchedRef.current) {
-          dataFetchedRef.current = true
-          fetchDashboardData(session.user)
-        }
-      }
+    if (isAuthenticated && user) {
+      console.log('[useDashboardData] 检测到用户已登录或数据刷新事件，开始获取数据')
+      fetchDashboardData(user)
+    } else if (!isAuthenticated && isInitialized) {
+      // 如果用户已登出，清空数据
+      setActivities([])
+      setStats({
+        totalStudyDays: 0,
+        totalArticlesRead: 0,
+        totalExamsTaken: 0,
+        totalWordsMastered: 0,
+      })
+      setHeatmapData([])
+      setRadarData([])
     }
-
-    initData()
-
-    return () => {
-      mounted = false
-      if (authSubscription) {
-        authSubscription.unsubscribe()
-      }
-    }
-  }, [fetchDashboardData, supabase.auth])
+  }, [isAuthenticated, user, refreshTrigger, fetchDashboardData, isInitialized])
 
   /**
    * 计算统计数据
@@ -302,13 +282,13 @@ export function useDashboardData() {
 
   /**
    * 刷新数据
+   * 可以被外部组件主动调用，用于手动刷新
    */
   const refresh = useCallback(() => {
-    dataFetchedRef.current = false
+    console.log('[useDashboardData] 手动刷新数据...')
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        dataFetchedRef.current = true
         fetchDashboardData(session.user)
       }
     }

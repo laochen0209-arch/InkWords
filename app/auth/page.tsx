@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowRight, X, Loader2, Mail, Lock, ShieldCheck } from "lucide-react"
 import { useToast } from "@/components/ink-toast/toast-context"
 import { supabase } from "@/lib/supabase"
-import { useAuth } from "@/lib/contexts/auth-context"
+import { useLanguage } from "@/lib/contexts/language-context"
 
 /**
  * 登录页
@@ -28,13 +28,11 @@ import { useAuth } from "@/lib/contexts/auth-context"
 export default function AuthPage() {
   const toast = useToast()
   const router = useRouter()
-  const { isAuthenticated } = useAuth()
+  const { uiLanguage } = useLanguage()
   const [account, setAccount] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [lang, setLang] = useState<"zh" | "en">("zh")
-  const [loginAttempted, setLoginAttempted] = useState(false)
 
   // 忘记密码相关状态
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -47,36 +45,40 @@ export default function AuthPage() {
   const [isResettingPassword, setIsResettingPassword] = useState(false)
 
   /**
-   * 【防御逻辑】组件挂载时清理存储空间
-   * 防止 LocalStorage 爆满导致 Supabase 无法写入 Token
+   * 【防御逻辑】组件挂载时清理认证相关存储空间
+   * 保留语言设置，只清除认证相关的存储项
    */
   useEffect(() => {
-    // 清理存储空间，确保 Supabase 有足够空间
+    // 需要保留的存储项
+    const keepKeys = [
+      'pref_lang',
+      'inkwords_learning_mode',
+      'inkwords_native_lang',
+      'inkwords_target_lang',
+      'inkwords_ui_language'
+    ]
+
     try {
-      console.log('[Auth Page] 清理 LocalStorage 和 SessionStorage...')
-      localStorage.clear()
+      console.log('[Auth Page] 清理认证相关 LocalStorage 和 SessionStorage...')
+      
+      // 只清理非保留的 LocalStorage 项
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && !keepKeys.includes(key) && !key.startsWith('sb-')) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key))
+      
+      // 清空 SessionStorage（一般不需要保留）
       sessionStorage.clear()
-      console.log('[Auth Page] 存储空间已清理')
+      
+      console.log('[Auth Page] 存储清理完成，保留了语言设置')
     } catch (e) {
       console.error('[Auth Page] 清理存储失败:', e)
     }
-
-    // 恢复语言设置（清理后重新设置）
-    const savedLang = localStorage.getItem('pref_lang') as "zh" | "en" | null
-    if (savedLang) {
-      setLang(savedLang)
-    }
   }, [])
-
-  /**
-   * 【新增】监听认证状态变化，登录成功后跳转
-   */
-  useEffect(() => {
-    if (loginAttempted && isAuthenticated) {
-      console.log('[Auth Page] 检测到已登录状态，跳转到 /study')
-      router.push('/study')
-    }
-  }, [isAuthenticated, loginAttempted, router])
 
   const texts = {
     zh: {
@@ -121,12 +123,13 @@ export default function AuthPage() {
     }
   }
 
+  const lang = uiLanguage === 'zh' ? 'zh' : 'en'
   const t = texts[lang]
 
   /**
    * 【核心】登录处理函数
    * 直接使用 Supabase 官方 signInWithPassword 方法
-   * 优化：设置登录状态标记，等待 AuthContext 同步后跳转
+   * 【优化】登录成功后立即跳转，不等待完整用户资料加载
    */
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -137,7 +140,6 @@ export default function AuthPage() {
     }
     
     setIsLoading(true)
-    setLoginAttempted(false)
     
     try {
       console.log('[Auth Page] 开始登录...')
@@ -170,9 +172,10 @@ export default function AuthPage() {
           )
         }
       } else if (data.user) {
-        console.log('[Auth Page] Supabase 登录成功，等待 AuthContext 同步...')
-        setLoginAttempted(true)
-        // 不立即跳转，由 useEffect 监听 isAuthenticated 变化后跳转
+        console.log('[Auth Page] Supabase 登录成功，立即跳转到 /study')
+        // 【优化】登录成功后立即跳转，不等待 AuthContext 同步和完整用户资料加载
+        // AuthContext 会在后台异步加载用户资料，不影响用户体验
+        router.push('/study')
       }
     } catch (error: any) {
       console.error('[Auth Page] 登录异常:', error)

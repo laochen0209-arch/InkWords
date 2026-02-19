@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/ink-toast/toast-context"
 import { GlobalClickEffect } from "@/components/global-click-effect"
 import { LanguageProvider } from "@/lib/contexts/language-context"
 import { AuthProvider } from "@/lib/contexts/auth-context"
+import { DataRefreshProvider } from "@/lib/contexts/data-refresh-context"
 import { ThemeInit } from "@/components/theme-init"
 import { TidioProvider } from "@/components/tidio-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -136,15 +137,17 @@ export default function RootLayout({
       <body className="antialiased font-sans">
         <ErrorBoundary>
           <AuthProvider>
-            <LanguageProvider>
-              <ThemeInit />
-              <GlobalClickEffect />
-              <TidioProvider>
-                <ToastProvider>
-                  {children}
-                </ToastProvider>
-              </TidioProvider>
-            </LanguageProvider>
+            <DataRefreshProvider>
+              <LanguageProvider>
+                <ThemeInit />
+                <GlobalClickEffect />
+                <TidioProvider>
+                  <ToastProvider>
+                    {children}
+                  </ToastProvider>
+                </TidioProvider>
+              </LanguageProvider>
+            </DataRefreshProvider>
           </AuthProvider>
         </ErrorBoundary>
       </body>

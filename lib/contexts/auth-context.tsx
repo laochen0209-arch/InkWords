@@ -230,27 +230,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * 刷新会话（供外部调用）
+   * 【优化】先用基础用户数据快速响应，再后台加载完整资料
    */
   const refreshSession = async () => {
     try {
+      console.log('[Auth Context] 开始刷新会话...')
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error || !session?.user) {
+        console.warn('[Auth Context] 刷新会话失败，设置为未登录')
         setAuthState({ status: 'unauthenticated', user: null })
         return
       }
       
       if (session.user.id) {
+        console.log('[Auth Context] 清除用户资料缓存')
         cache.delete(`user_profile_${session.user.id}`)
       }
       
       // 【优化】先用基础用户数据快速响应
+      console.log('[Auth Context] 使用基础用户数据快速设置状态')
       const baseUser = createBaseUser(session.user)
       setAuthState({ status: 'authenticated', user: baseUser })
       
       // 后台异步获取完整用户资料
+      console.log('[Auth Context] 后台异步加载完整用户资料...')
       fetchUserProfile(session.user, true)
     } catch (error) {
+      console.error('[Auth Context] 刷新会话异常:', error)
       setAuthState({ status: 'unauthenticated', user: null })
     }
   }
@@ -342,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
 
+        console.log('[Auth Context] 开始初始化认证状态...')
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
         if (!isMounted) {
@@ -349,22 +357,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (sessionError) {
+          console.error('[Auth Context] 获取会话失败:', sessionError)
           setAuthState({ status: 'unauthenticated', user: null })
           return
         }
 
         if (!session?.user) {
+          console.log('[Auth Context] 未找到有效会话，设置为未登录状态')
           setAuthState({ status: 'unauthenticated', user: null })
           return
         }
 
-        // 【优化】先用基础用户数据快速响应
+        console.log('[Auth Context] 找到有效会话，快速设置认证状态')
+        // 【优化】先用基础用户数据快速响应，立即让用户进入应用
+        // 不需要等待数据库查询完成，提升用户体验
         const baseUser = createBaseUser(session.user)
         setAuthState({ status: 'authenticated', user: baseUser })
         
-        // 后台异步获取完整用户资料
+        // 【优化】后台异步获取完整用户资料
+        // 用户资料会在获取完成后自动更新，不阻塞初始页面加载
+        console.log('[Auth Context] 后台异步加载完整用户资料...')
         fetchUserProfile(session.user, true)
       } catch (error) {
+        console.error('[Auth Context] 初始化认证状态异常:', error)
         if (isMounted) {
           setAuthState({ status: 'unauthenticated', user: null })
         }
@@ -380,24 +395,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         switch (event) {
           case 'SIGNED_IN':
             if (session?.user) {
-              // 【优化】先用基础用户数据快速响应
+              console.log('[Auth Context] 检测到 SIGNED_IN 事件，用户已登录')
+              // 【优化】先用基础用户数据快速响应，立即设置 authenticated 状态
+              // 这样用户跳转后可以立即看到页面，不需要等待完整用户资料
               const baseUser = createBaseUser(session.user)
               setAuthState({ status: 'authenticated', user: baseUser })
               
-              // 后台异步获取完整用户资料
+              // 【优化】后台异步获取完整用户资料，不阻塞用户体验
+              // 用户资料会在获取完成后自动更新状态
+              console.log('[Auth Context] 后台异步加载完整用户资料...')
               fetchUserProfile(session.user, true)
             }
             break
             
           case 'SIGNED_OUT':
+            console.log('[Auth Context] 检测到 SIGNED_OUT 事件，用户已登出')
             setAuthState({ status: 'unauthenticated', user: null })
             break
             
           case 'TOKEN_REFRESHED':
+            console.log('[Auth Context] Token 已刷新')
             break
             
           case 'USER_UPDATED':
             if (session?.user) {
+              console.log('[Auth Context] 用户信息已更新，重新获取用户资料')
               const user = await fetchUserProfile(session.user)
               if (user) {
                 setAuthState({ status: 'authenticated', user })

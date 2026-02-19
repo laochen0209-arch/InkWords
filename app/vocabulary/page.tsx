@@ -15,6 +15,7 @@ import { VocabularyCard } from "@/components/vocabulary/vocabulary-card"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
 import { logUserActivity } from "@/lib/supabase"
 import { useLanguage } from "@/lib/contexts/language-context"
+import { useDataRefresh } from "@/lib/contexts/data-refresh-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 
 interface WordItem {
@@ -68,10 +69,12 @@ const itemVariants: Variants = {
  * - 支持播放发音
  * - 标记单词为已掌握
  * - 移除单词
+ * - 支持实时数据刷新
  */
 export default function VocabularyPage() {
   const [words, setWords] = useState<WordItem[]>(mockWords)
   const { learningMode } = useLanguage()
+  const { triggerRefresh } = useDataRefresh()
   const t = TRANSLATIONS[learningMode]
   
   type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
@@ -103,6 +106,10 @@ export default function VocabularyPage() {
       undefined,
       { word: wordItem.word }
     )
+
+    // 触发全局数据刷新，让 dashboard 和 profile 页面显示最新数据
+    triggerRefresh()
+    console.log('[VocabularyPage] 已触发全局数据刷新')
   }
 
   const handlePlay = (word: string) => {
