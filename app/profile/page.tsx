@@ -133,8 +133,8 @@ export default function ProfilePage() {
                       </p>
                     </div>
 
-                    {/* VIP 特权列表 */}
-                    <div className="grid grid-cols-2 gap-3 mb-6">
+                    {/* VIP 特权列表 - 居中对齐 */}
+                    <div className="flex flex-col items-center gap-3 mb-6">
                       {vipBenefits.map((benefit, index) => (
                         <div key={index} className="flex items-center gap-2 text-[#FDFBF7]/80 text-sm">
                           <benefit.icon className="w-4 h-4 text-[#D4AF37]" />
