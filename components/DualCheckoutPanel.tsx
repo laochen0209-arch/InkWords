@@ -5,16 +5,13 @@ import { CreditCard, Globe, Heart, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * 双引擎收银台组件 - 水墨融合风格
+ * 双引擎收银台组件 - 高级水墨融合风格
  * 
  * 设计理念：
  * - 采用半透明毛玻璃效果，融入水墨背景
  * - 低饱和度品牌色点缀，不喧宾夺主
  * - 极简排版，呼吸感十足
- * 
- * 功能：
- * - 国内用户：跳转爱发电（微信/支付宝）
- * - 海外用户：跳转 Patreon（信用卡/PayPal）
+ * - 价格数字精致清晰（￥9.9 / $3.99）
  * 
  * @author InkWords Team
  * @since 2025-02-19
@@ -57,9 +54,10 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
     }
   }
 
-  // 根据套餐类型显示不同价格
-  const domesticPrice = planType === "month" ? "￥28/月" : "￥268/年"
-  const internationalPrice = planType === "month" ? "$3.99/mo" : "$39.9/yr"
+  // 根据套餐类型显示不同价格 - 使用 ￥9.9 / $3.99 格式
+  const domesticPrice = planType === "month" ? "￥9.9" : "￥99"
+  const internationalPrice = planType === "month" ? "$3.99" : "$39.9"
+  const periodLabel = planType === "month" ? "/月" : "/年"
 
   return (
     <div className="w-full space-y-5">
@@ -116,10 +114,13 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
                 </span>
               </div>
 
-              {/* 价格 - 精致清晰 */}
+              {/* 价格 - 精致清晰（￥9.9 / ￥99） */}
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-serif font-semibold text-stone-900 tracking-tight">
+                <span className="text-3xl font-serif font-semibold text-stone-900 tracking-tight">
                   {domesticPrice}
+                </span>
+                <span className="text-sm text-stone-500/70 font-light">
+                  {periodLabel}
                 </span>
               </div>
 
@@ -197,10 +198,13 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
                 </span>
               </div>
 
-              {/* 价格 - 精致清晰 */}
+              {/* 价格 - 精致清晰（$3.99 / $39.9） */}
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-serif font-semibold text-stone-900 tracking-tight">
+                <span className="text-3xl font-serif font-semibold text-stone-900 tracking-tight">
                   {internationalPrice}
+                </span>
+                <span className="text-sm text-stone-500/70 font-light">
+                  {periodLabel}
                 </span>
               </div>
 
