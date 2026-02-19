@@ -17,7 +17,12 @@ export default function OnboardingPage() {
     // 将 id 映射为 LearningMode
     // "en" 表示学中文（母语英文），"zh" 表示学英文（母语文）
     const learningMode = langId === "en" ? "LEARN_CHINESE" : "LEARN_ENGLISH"
-    localStorage.setItem('inkwords_learning_mode', learningMode)
+    
+    // 确保在客户端执行
+    if (typeof window !== "undefined") {
+      localStorage.setItem('inkwords_learning_mode', learningMode)
+    }
+    
     router.push("/auth")
   }
 

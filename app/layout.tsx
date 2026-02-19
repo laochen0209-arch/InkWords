@@ -125,18 +125,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <LanguageProvider>
-          <html
-            lang="zh-CN"
-            className={`${notoSerifSC.variable} ${notoSansSC.variable}`}
-            suppressHydrationWarning
-          >
-            <head>
-              <PreloadResources />
-            </head>
-            <body className="antialiased font-sans">
+    <html
+      lang="zh-CN"
+      className={`${notoSerifSC.variable} ${notoSansSC.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <PreloadResources />
+      </head>
+      <body className="antialiased font-sans">
+        <ErrorBoundary>
+          <AuthProvider>
+            <LanguageProvider>
               <ThemeInit />
               <GlobalClickEffect />
               <TidioProvider>
@@ -144,11 +144,10 @@ export default function RootLayout({
                   {children}
                 </ToastProvider>
               </TidioProvider>
-
-            </body>
-          </html>
-        </LanguageProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+            </LanguageProvider>
+          </AuthProvider>
+        </ErrorBoundary>
+      </body>
+    </html>
   )
 }
