@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 
 /**
  * 题目类型
@@ -311,6 +312,33 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Practice Submit] 保存了', details.sections.reduce((sum, s) => sum + s.wrongAnswers.length, 0), '道错题')
+
+    // 【新增】记录到 user_activities 表，用于个人页面统计
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      
+      await supabase.from('user_activities').insert({
+        user_id: userId,
+        action_type: 'take_exam',
+        target_id: examResult.id,
+        details: {
+          score: finalScore,
+          exam_type: examData.examType,
+          sections: details.sections.map(s => ({
+            type: s.type,
+            score: s.score,
+            maxScore: s.maxScore
+          }))
+        },
+        created_at: new Date().toISOString()
+      })
+      console.log('[Practice Submit] 考试记录已保存到 user_activities')
+    } catch (activityError) {
+      // 不影响主流程，仅记录错误
+      console.error('[Practice Submit] 记录 user_activities 失败:', activityError)
+    }
 
     return NextResponse.json(
       {

@@ -43,6 +43,7 @@ interface AuthContextType {
   updateUserProfile: (data: Partial<User>) => void
   isVip: boolean
   refreshSession: () => Promise<void>
+  refreshUserStats: () => Promise<void>
 }
 
 type AuthState = 
@@ -255,6 +256,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   /**
+   * 【新增】刷新用户统计数据（学习天数等）
+   */
+  const refreshUserStats = async () => {
+    if (authState.status !== 'authenticated' || !authState.user?.id) {
+      return
+    }
+
+    try {
+      const { data: userData, error } = await supabase
+        .from("users")
+        .select("study_daily_count, library_daily_count, practice_tickets, streak, points")
+        .eq("id", authState.user.id)
+        .single()
+
+      if (error) {
+        console.error('[Auth] 刷新用户统计数据失败:', error)
+        return
+      }
+
+      if (userData) {
+        setAuthState(prev => {
+          if (prev.status !== 'authenticated') return prev
+          
+          const updatedUser = {
+            ...prev.user,
+            study_daily_count: userData.study_daily_count || 0,
+            library_daily_count: userData.library_daily_count || 0,
+            practice_tickets: userData.practice_tickets || 0,
+            streak: userData.streak || 0,
+            points: userData.points || 0
+          }
+          
+          // 更新缓存
+          cacheUserProfile(updatedUser)
+          
+          return {
+            status: 'authenticated',
+            user: updatedUser
+          }
+        })
+        
+        console.log('[Auth] 用户统计数据已刷新')
+      }
+    } catch (error) {
+      console.error('[Auth] 刷新用户统计数据时发生错误:', error)
+    }
+  }
+
+  /**
    * 更新用户资料
    */
   const updateUserProfile = (data: Partial<User>) => {
@@ -383,7 +433,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated,
     updateUserProfile,
     isVip,
-    refreshSession
+    refreshSession,
+    refreshUserStats
   }
 
   return (

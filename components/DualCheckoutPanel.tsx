@@ -144,18 +144,18 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
                   {/* 文字 */}
                   <div className="text-left">
-                    <span className="text-base font-medium text-stone-800 tracking-wide">
+                    <span className="text-base font-medium text-[#D4AF37] tracking-wide">
                       微信 / 支付宝
                     </span>
-                    <p className="text-xs text-stone-500 mt-0.5">
+                    <p className="text-xs text-[#D4AF37]/70 mt-0.5">
                       爱发电支持
                     </p>
                   </div>
                 </div>
 
                 {/* 箭头 */}
-                <div className="w-8 h-8 rounded-full bg-stone-100/80 flex items-center justify-center group-hover:bg-emerald-50/80 transition-colors">
-                  <ArrowUpRight className="w-4 h-4 text-stone-500/70" />
+                <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center group-hover:bg-[#D4AF37]/30 transition-colors">
+                  <ArrowUpRight className="w-4 h-4 text-[#D4AF37]" />
                 </div>
               </div>
             </motion.button>
@@ -197,18 +197,18 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
                   {/* 文字 */}
                   <div className="text-left">
-                    <span className="text-base font-medium text-stone-800 tracking-wide">
+                    <span className="text-base font-medium text-[#D4AF37] tracking-wide">
                       Credit Card / PayPal
                     </span>
-                    <p className="text-xs text-stone-500 mt-0.5">
+                    <p className="text-xs text-[#D4AF37]/70 mt-0.5">
                       Patreon支持
                     </p>
                   </div>
                 </div>
 
                 {/* 箭头 */}
-                <div className="w-8 h-8 rounded-full bg-stone-100/80 flex items-center justify-center group-hover:bg-amber-50/80 transition-colors">
-                  <ArrowUpRight className="w-4 h-4 text-stone-500/70" />
+                <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center group-hover:bg-[#D4AF37]/30 transition-colors">
+                  <ArrowUpRight className="w-4 h-4 text-[#D4AF37]" />
                 </div>
               </div>
             </motion.button>
@@ -267,20 +267,20 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
               <div className="relative z-10 flex items-center justify-between pl-3">
                 <div className="text-left">
-                  <span className="text-base font-medium text-stone-800">
+                  <span className="text-base font-medium text-[#D4AF37]">
                     {selectedMethod === "domestic" ? "月度会员" : "Monthly Plan"}
                   </span>
-                  <p className="text-xs text-stone-500 mt-1">
+                  <p className="text-xs text-[#D4AF37]/70 mt-1">
                     {selectedMethod === "domestic" ? "按月付费，随时取消" : "Billed monthly, cancel anytime"}
                   </p>
                 </div>
 
                 {/* 价格 */}
                 <div className="text-right">
-                  <span className="text-2xl font-serif font-semibold text-stone-900">
+                  <span className="text-2xl font-serif font-semibold text-[#D4AF37]">
                     {selectedMethod === "domestic" ? prices.domestic.month : prices.international.month}
                   </span>
-                  <span className="text-sm text-stone-500 ml-1">
+                  <span className="text-sm text-[#D4AF37]/70 ml-1">
                     {selectedMethod === "domestic" ? "/月" : "/mo"}
                   </span>
                 </div>
@@ -318,20 +318,20 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
               <div className="relative z-10 flex items-center justify-between pl-3">
                 <div className="text-left">
-                  <span className="text-base font-medium text-stone-800">
+                  <span className="text-base font-medium text-[#D4AF37]">
                     {selectedMethod === "domestic" ? "年度会员" : "Yearly Plan"}
                   </span>
-                  <p className="text-xs text-stone-500 mt-1">
+                  <p className="text-xs text-[#D4AF37]/70 mt-1">
                     {selectedMethod === "domestic" ? "年付更优惠" : "Save with yearly billing"}
                   </p>
                 </div>
 
                 {/* 价格 */}
                 <div className="text-right">
-                  <span className="text-2xl font-serif font-semibold text-stone-900">
+                  <span className="text-2xl font-serif font-semibold text-[#D4AF37]">
                     {selectedMethod === "domestic" ? prices.domestic.year : prices.international.year}
                   </span>
-                  <span className="text-sm text-stone-500 ml-1">
+                  <span className="text-sm text-[#D4AF37]/70 ml-1">
                     {selectedMethod === "domestic" ? "/年" : "/yr"}
                   </span>
                 </div>
@@ -341,22 +341,22 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
         )}
       </AnimatePresence>
 
-      {/* 
+      {/*
         ========================================
         温馨提示
         ========================================
       */}
       <div className={cn(
         "mt-6 p-4 rounded-2xl",
-        "bg-stone-100/30",
+        "bg-[#D4AF37]/10",
         "backdrop-blur-sm",
-        "border border-stone-200/30"
+        "border border-[#D4AF37]/20"
       )}>
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-stone-200/50 flex items-center justify-center flex-shrink-0">
-            <CreditCard className="w-3.5 h-3.5 text-stone-600" />
+          <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center flex-shrink-0">
+            <CreditCard className="w-3.5 h-3.5 text-[#D4AF37]" />
           </div>
-          <p className="text-xs text-stone-600 leading-relaxed pt-1.5">
+          <p className="text-xs text-[#D4AF37]/80 leading-relaxed pt-1.5">
             支付完成后，系统将在 1 分钟内自动为您点亮 Pro 状态。如有问题请联系客服。
           </p>
         </div>

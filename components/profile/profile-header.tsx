@@ -5,7 +5,7 @@ import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { NativeLang } from "@/lib/language-utils"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { createBrowserClient } from "@/lib/supabase/client"
 
 interface StatItem {
@@ -31,7 +31,7 @@ interface ProfileHeaderProps {
  *       LEARN_CHINESE = 英文界面（学中文的英文用户）
  */
 export function ProfileHeader({ nativeLang = "zh" }: ProfileHeaderProps) {
-  const { user, isVip } = useAuth()
+  const { user, isVip, refreshUserStats } = useAuth()
   const { learningMode } = useLanguage()
   const [wordsLearned, setWordsLearned] = useState(0)
   const [accuracy, setAccuracy] = useState(0)
@@ -47,12 +47,57 @@ export function ProfileHeader({ nativeLang = "zh" }: ProfileHeaderProps) {
 
   const t = TRANSLATIONS[learningMode]
 
+  // 【新增】获取用户真实统计数据的函数
+  const fetchUserStats = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      const supabase = supabaseRef.current!
+      
+      // 获取已学单词数
+      const { count: wordsCount, error: wordsError } = await supabase
+        .from('user_activities')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('action_type', 'learn_word')
+
+      if (!wordsError) {
+        setWordsLearned(wordsCount || 0)
+      }
+
+      // 获取考试记录计算准确率
+      const { data: examData, error: examError } = await supabase
+        .from('user_activities')
+        .select('details')
+        .eq('user_id', user.id)
+        .eq('action_type', 'take_exam')
+
+      if (!examError && examData && examData.length > 0) {
+        const totalScore = examData.reduce((sum, record) => {
+          return sum + (record.details?.score || 0)
+        }, 0)
+        const avgAccuracy = Math.round(totalScore / examData.length)
+        setAccuracy(avgAccuracy)
+      } else {
+        setAccuracy(0)
+      }
+    } catch (error) {
+      console.error('获取用户统计数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
+
   // 获取用户真实统计数据
   useEffect(() => {
     // 【修复】添加标志位防止重复请求
     let isMounted = true
     
-    const fetchUserStats = async () => {
+    const fetchStats = async () => {
       if (!user?.id) {
         setLoading(false)
         return
@@ -98,7 +143,7 @@ export function ProfileHeader({ nativeLang = "zh" }: ProfileHeaderProps) {
       }
     }
 
-    fetchUserStats()
+    fetchStats()
     
     // 【修复】清理函数
     return () => {
@@ -106,6 +151,24 @@ export function ProfileHeader({ nativeLang = "zh" }: ProfileHeaderProps) {
     }
   // 【修复】移除 supabase 从依赖数组，只监听 user?.id
   }, [user?.id])
+
+  // 【新增】页面聚焦时刷新数据
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.id) {
+        // 页面重新可见时刷新统计数据
+        fetchUserStats()
+        // 同时刷新 auth-context 中的用户统计数据（学习天数等）
+        refreshUserStats()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [user?.id, fetchUserStats, refreshUserStats])
 
   // 判断是否为中文界面 - 【修复】移到 stats 数组之前，避免暂时性死区错误
   const isChineseUI = learningMode === "LEARN_ENGLISH"

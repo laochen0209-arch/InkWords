@@ -431,35 +431,89 @@ export default function ExamDrillPage() {
     console.log('[Auth] userRef 已更新:', user?.id || 'null');
   }, [user]);
   
-  // 1. 加载数据
+  // 1. 加载数据 - 【修复】从 mock_exams 表获取数据
   useEffect(() => {
     const fetchExamData = async () => {
       if (!params.examId) return;
 
       try {
+        // 【修复】从 mock_exams 表获取试卷数据
         const { data: examData, error: examError } = await supabase
-          .from('exams')
+          .from('mock_exams')
           .select('*')
           .eq('id', params.examId)
           .single();
 
         if (examError || !examData) throw new Error('Exam not found');
-        setExam(examData);
+        
+        // 【修复】转换 mock_exams 数据格式以匹配组件期望的格式
+        const formattedExam = {
+          id: examData.id,
+          title: `${examData.exam_type} 模拟试卷`,
+          category: examData.exam_type,
+          content: examData.rewritten_content || '',
+          difficulty: 'medium',
+          exam_type: examData.exam_type,
+          sections: examData.sections,
+          questions: examData.questions,
+          created_at: examData.created_at,
+          updated_at: examData.updated_at
+        };
+        setExam(formattedExam);
 
-        const { data: qData } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('exam_id', params.examId)
-          .order('created_at', { ascending: true });
-
-        if (qData) {
-          const parsedQuestions = qData.map(q => ({
-            ...q,
-            options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
-            type: q.type || 'choice'
-          }));
-          setQuestions(parsedQuestions);
+        // 【修复】从 sections 或 questions 字段提取题目数据
+        let extractedQuestions: any[] = [];
+        
+        if (examData.sections && Array.isArray(examData.sections)) {
+          // 从 sections 中提取所有 questions
+          examData.sections.forEach((section: any) => {
+            if (section.questions && Array.isArray(section.questions)) {
+              const sectionQuestions = section.questions.map((q: any, idx: number) => ({
+                id: q.id || `${section.type}-q${idx}`,
+                content: q.content || q.stem || '题目内容缺失',
+                options: q.options || [],
+                correct_answer: q.answer || q.correct_answer || '',
+                explanation: q.analysis || q.explanation || '',
+                explanation_cn: q.analysis_cn || q.explanation_cn || '',
+                explanation_en: q.analysis_en || q.explanation_en || '',
+                type: q.type || (q.options?.length > 0 ? 'choice' : 'fill_blank'),
+                section_type: section.type
+              }));
+              extractedQuestions = [...extractedQuestions, ...sectionQuestions];
+            }
+          });
         }
+        
+        // 如果没有从 sections 提取到题目，尝试从 questions 字段获取
+        if (extractedQuestions.length === 0 && examData.questions) {
+          const oldQuestions = typeof examData.questions === 'string' 
+            ? JSON.parse(examData.questions) 
+            : examData.questions;
+          
+          if (Array.isArray(oldQuestions)) {
+            extractedQuestions = oldQuestions.map((q: any, idx: number) => ({
+              id: q.id || `q${idx}`,
+              content: q.content || q.stem || '题目内容缺失',
+              options: q.options || [],
+              correct_answer: q.answer || q.correct_answer || '',
+              explanation: q.analysis || q.explanation || '',
+              explanation_cn: q.analysis_cn || q.explanation_cn || '',
+              explanation_en: q.analysis_en || q.explanation_en || '',
+              type: q.type || (q.options?.length > 0 ? 'choice' : 'fill_blank'),
+              section_type: 'reading'
+            }));
+          }
+        }
+
+        // 解析 options 字段（如果是字符串）
+        const parsedQuestions = extractedQuestions.map(q => ({
+          ...q,
+          options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+          type: q.type || 'choice'
+        }));
+        
+        setQuestions(parsedQuestions);
+        console.log('[ExamDetail] 加载题目数量:', parsedQuestions.length);
       } catch (error) {
         console.error('Failed to load:', error);
       } finally {

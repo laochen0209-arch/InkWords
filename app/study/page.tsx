@@ -25,6 +25,8 @@ import confetti from "canvas-confetti"
 import { pinyin } from "pinyin-pro"
 import { recordStudy } from "@/lib/user-stats"
 import { logger } from "@/lib/logger"
+import { playSuccessSound, playErrorSound, initAudioContext } from "@/lib/sound-effects"
+import { logUserActivity } from "@/lib/supabase"
 
 // LocalStorage keys
 const STORAGE_KEYS = {
@@ -363,18 +365,26 @@ function StudyPageContent() {
     const newInputs = [...sentenceInputs]
     newInputs[index] = value
     setSentenceInputs(newInputs)
-    
-    // 【新增】实时错误检测
+
+    // 【新增】实时错误检测 - 使用忽略标点的比较
     if (!isLearnChinese && practiceMode === 'sentence') {
       const sentence = currentItem as SentenceItem
       const tokens = sentence?.en?.split(/\s+/).filter(Boolean) || []
       const correctWord = tokens[index]?.toLowerCase() || ''
       const userWord = value.toLowerCase().trim()
-      
+
+      // 辅助函数：去除标点符号
+      const stripPunctuation = (text: string) => {
+        return text.replace(/[.,!?;:'"()\-\[\]{}]/g, '')
+      }
+
       // 只有当用户输入完成一个单词时才检测（输入长度 >= 正确答案长度）
+      // 使用忽略标点的比较
+      const normalizedUser = stripPunctuation(userWord)
+      const normalizedCorrect = stripPunctuation(correctWord)
       if (userWord.length >= correctWord.length && correctWord.length > 0) {
         const newErrors = [...inputErrors]
-        newErrors[index] = userWord !== correctWord
+        newErrors[index] = normalizedUser !== normalizedCorrect
         setInputErrors(newErrors)
       } else if (userWord.length === 0) {
         // 清空输入时重置错误状态
@@ -398,6 +408,20 @@ function StudyPageContent() {
         if (userId) {
           await recordStudy(1, userId)
           logger.log('学习记录已更新')
+          
+          // 【修复】同时记录到 user_activities 表，用于个人页面统计
+          const currentWordItem = practiceMode === "word" ? currentWord : null
+          await logUserActivity(
+            'learn_word',
+            currentWordItem?.id,
+            {
+              word: currentWordItem?.word,
+              meaning: currentWordItem?.meaning,
+              category: selectedCategory,
+              mode: practiceMode
+            }
+          )
+          logger.log('学习活动已记录到 user_activities')
         } else {
           logger.warn('用户未登录，跳过学习记录更新')
         }
@@ -440,6 +464,15 @@ function StudyPageContent() {
         .replace(/；/g, ';') // 中文分号 -> 英文
     }
 
+    // 🛠️ 辅助函数：去除标点符号（用于答案比较）
+    const stripPunctuation = (text: string) => {
+      return text
+        .toLowerCase()
+        .trim()
+        .replace(/[.,!?;:'"()\-\[\]{}]/g, '') // 去除英文标点
+        .replace(/[，。！？""''（）：；、]/g, '') // 去除中文标点
+    }
+
     let correctAnswer: string
     let userAnswer: string
     
@@ -476,22 +509,29 @@ function StudyPageContent() {
         setIsShaking(false)
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
         
+        // 播放正确音效
+        playSuccessSound()
+        
         // 不再自动跳转，等待用户按回车或空格键
         // 用户可以在查看正确答案后，按回车或空格键继续
       } else {
         setFeedbackStatus('wrong')
         
+        // 播放错误音效
+        playErrorSound()
+        
         // 【新增】触发抖动动画
         setIsShaking(true)
         setTimeout(() => setIsShaking(false), 500)
         
-        // 【新增】更新每个单词的错误状态（仅学英文模式）
+        // 【新增】更新每个单词的错误状态（仅学英文模式）- 使用忽略标点的比较
         if (!isLearnChinese && practiceMode === 'sentence') {
           const sentence = currentItem as SentenceItem
           const tokens = sentence?.en?.split(/\s+/).filter(Boolean) || []
           const newErrors = tokens.map((token, idx) => {
             const userWord = sentenceInputs[idx]?.toLowerCase().trim() || ''
-            return userWord !== token.toLowerCase()
+            // 使用忽略标点的比较
+            return stripPunctuation(userWord) !== stripPunctuation(token)
           })
           setInputErrors(newErrors)
         }
@@ -543,6 +583,9 @@ function StudyPageContent() {
   // 全局键盘监听 - Enter/空格键控制检查/下一题
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // 初始化音频上下文（用户首次交互时）
+      initAudioContext()
+      
       // 支持 Enter 键和空格键
       if ((e.key === 'Enter' || e.key === ' ') && mode === 'B' && currentItem) {
         // 防止空格键滚动页面
@@ -1351,60 +1394,74 @@ function StudyPageContent() {
                                 const hasError = inputErrors[index] && value.length > 0
                                 const isCorrect = feedbackStatus === 'correct'
 
+                                // 【新增】提取单词中的标点符号
+                                const punctuationMatch = correctWord.match(/[.,!?;:'"()\-\[\]{}]+$/)
+                                const punctuation = punctuationMatch ? punctuationMatch[0] : ''
+                                const wordWithoutPunctuation = correctWord.replace(/[.,!?;:'"()\-\[\]{}]+$/, '')
+
                                 // 【优化】根据单词长度精确计算宽度，每个字符约 14px，加上 padding
+                                // 使用去除标点的单词长度计算宽度
                                 const charWidth = 14
                                 const padding = 16
-                                const minWidth = Math.max(50, correctWord.length * charWidth + padding)
+                                const minWidth = Math.max(50, wordWithoutPunctuation.length * charWidth + padding)
 
                                 return (
                                   <div key={index} className="relative flex flex-col items-center">
-                                    <input
-                                      ref={el => { sentenceInputRefs.current[index] = el }}
-                                      type="text"
-                                      value={value || ''}
-                                      onChange={(e) => handleSentenceInputChange(index, e.target.value)}
-                                      onKeyDown={(e) => {
-                                        // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
-                                        if (e.key === 'Enter') {
-                                          e.stopPropagation()
-                                          e.preventDefault()
+                                    <div className="flex items-center">
+                                      <input
+                                        ref={el => { sentenceInputRefs.current[index] = el }}
+                                        type="text"
+                                        value={value || ''}
+                                        onChange={(e) => handleSentenceInputChange(index, e.target.value)}
+                                        onKeyDown={(e) => {
+                                          // ✅ 核心修复：阻止冒泡，防止全局监听器再次触发
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation()
+                                            e.preventDefault()
 
-                                          if (feedbackStatus === 'correct') {
-                                            handleNext()
-                                          } else if (index === sentenceInputs.length - 1) {
-                                            handleCheck()
+                                            if (feedbackStatus === 'correct') {
+                                              handleNext()
+                                            } else if (index === sentenceInputs.length - 1) {
+                                              handleCheck()
+                                            }
+                                            return
                                           }
-                                          return
-                                        }
 
-                                        // 原有的空格键跳转逻辑保持不变
-                                        if (e.key === ' ' && index < sentenceInputs.length - 1) {
-                                          e.preventDefault()
-                                          sentenceInputRefs.current[index + 1]?.focus()
-                                        }
+                                          // 原有的空格键跳转逻辑保持不变
+                                          if (e.key === ' ' && index < sentenceInputs.length - 1) {
+                                            e.preventDefault()
+                                            sentenceInputRefs.current[index + 1]?.focus()
+                                          }
 
-                                        // 原有的 Backspace 逻辑保持不变
-                                        if (e.key === 'Backspace' && !value && index > 0) {
-                                          sentenceInputRefs.current[index - 1]?.focus()
-                                        }
-                                      }}
-                                      readOnly={isCorrect}
-                                      style={{ width: `${minWidth}px` }}
-                                      className={`
-                                        h-12 text-lg font-serif px-2
-                                        border-0 border-b-2 rounded-none bg-transparent
-                                        text-center focus:outline-none
-                                        transition-all duration-200
-                                        ${isCorrect
-                                          ? "border-green-500 text-green-600"
-                                          : hasError && isShaking
-                                            ? "border-red-500 text-red-600 animate-shake"
-                                            : hasError
-                                              ? "border-red-500 text-red-600"
-                                              : "border-stone-400 text-ink-black focus:border-[#C23E32]"
-                                        }
-                                      `}
-                                    />
+                                          // 原有的 Backspace 逻辑保持不变
+                                          if (e.key === 'Backspace' && !value && index > 0) {
+                                            sentenceInputRefs.current[index - 1]?.focus()
+                                          }
+                                        }}
+                                        readOnly={isCorrect}
+                                        style={{ width: `${minWidth}px` }}
+                                        className={`
+                                          h-12 text-lg font-serif px-2
+                                          border-0 border-b-2 rounded-none bg-transparent
+                                          text-center focus:outline-none
+                                          transition-all duration-200
+                                          ${isCorrect
+                                            ? "border-green-500 text-green-600"
+                                            : hasError && isShaking
+                                              ? "border-red-500 text-red-600 animate-shake"
+                                              : hasError
+                                                ? "border-red-500 text-red-600"
+                                                : "border-stone-400 text-ink-black focus:border-[#C23E32]"
+                                          }
+                                        `}
+                                      />
+                                      {/* 【新增】标点符号作为静态文本显示 */}
+                                      {punctuation && (
+                                        <span className="text-lg font-serif text-ink-black ml-0.5">
+                                          {punctuation}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 )
                               })}
@@ -1530,7 +1587,10 @@ function StudyPageContent() {
                           <X className="w-6 h-6" />
                         </button>
                         <button
-                          onClick={handleCheck}
+                          onClick={() => {
+                            initAudioContext()
+                            handleCheck()
+                          }}
                           className="w-14 h-14 rounded-full flex items-center justify-center
                             bg-green-500 text-white shadow-lg
                             hover:bg-green-600 transition-colors"
