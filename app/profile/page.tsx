@@ -9,7 +9,7 @@ import { useToast } from "@/components/ink-toast/toast-context"
 import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
-import PayPalCheckoutButton from "@/components/PayPalCheckoutButton"
+import { DualCheckoutPanel } from "@/components/DualCheckoutPanel"
 import { Check, Crown, Sparkles, BookOpen, Library, Award } from "lucide-react"
 
 type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
@@ -193,9 +193,13 @@ export default function ProfilePage() {
                       </button>
                     </div>
 
-                    {/* PayPal 支付按钮 */}
+                    {/* 双引擎收银台 */}
                     <div className="bg-white/5 rounded-xl p-4">
-                      <PayPalCheckoutButton userId={user.id} price={plans[selectedPlan].price} />
+                      <DualCheckoutPanel 
+                        userId={user.id} 
+                        planType={selectedPlan === "monthly" ? "month" : "year"}
+                        price={plans[selectedPlan].price}
+                      />
                     </div>
 
                     {/* 安全提示 */}
