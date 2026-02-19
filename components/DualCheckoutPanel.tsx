@@ -41,18 +41,20 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
    * 处理国内支付（爱发电）
    */
   const handleDomesticPayment = () => {
-    // TODO: 后续替换为真实的专属支付链接
-    const afdianUrl = "https://afdian.net"
-    window.open(afdianUrl, "_blank")
+    if (typeof window !== "undefined") {
+      const afdianUrl = "https://afdian.net"
+      window.open(afdianUrl, "_blank")
+    }
   }
 
   /**
    * 处理海外支付（Patreon）
    */
   const handleInternationalPayment = () => {
-    // TODO: 后续替换为真实的 Patreon 链接
-    const patreonUrl = "https://patreon.com"
-    window.open(patreonUrl, "_blank")
+    if (typeof window !== "undefined") {
+      const patreonUrl = "https://patreon.com"
+      window.open(patreonUrl, "_blank")
+    }
   }
 
   // 根据套餐类型显示不同价格
@@ -74,9 +76,9 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
         className={cn(
           "w-full relative overflow-hidden",
           "rounded-2xl p-6",
-          "bg-white/40 dark:bg-black/40",
+          "bg-white/40",
           "backdrop-blur-md",
-          "border border-white/30 dark:border-white/10",
+          "border border-white/30",
           "shadow-sm hover:shadow-lg",
           "transition-all duration-500 ease-out",
           "group"
@@ -94,35 +96,35 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
             {/* 图标容器 - 极简圆形 */}
             <div className={cn(
               "w-14 h-14 rounded-full flex items-center justify-center",
-              "bg-emerald-50/80 dark:bg-emerald-950/30",
-              "border border-emerald-200/50 dark:border-emerald-800/30",
-              "group-hover:bg-emerald-100/80 dark:group-hover:bg-emerald-900/40",
+              "bg-emerald-50/80",
+              "border border-emerald-200/50",
+              "group-hover:bg-emerald-100/80",
               "transition-all duration-500"
             )}>
-              <Heart className="w-6 h-6 text-emerald-700/80 dark:text-emerald-400/80 group-hover:scale-110 transition-transform duration-500" />
+              <Heart className="w-6 h-6 text-emerald-700/80 group-hover:scale-110 transition-transform duration-500" />
             </div>
 
             {/* 文字内容 */}
             <div className="text-left">
               {/* 主标题 */}
               <div className="flex items-baseline gap-3">
-                <span className="text-base font-medium text-stone-800 dark:text-stone-200 tracking-wide">
+                <span className="text-base font-medium text-stone-800 tracking-wide">
                   微信 / 支付宝
                 </span>
-                <span className="text-xs text-emerald-700/60 dark:text-emerald-400/60 font-light">
+                <span className="text-xs text-emerald-700/60 font-light">
                   爱发电
                 </span>
               </div>
 
               {/* 价格 - 精致清晰 */}
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-serif font-semibold text-stone-900 dark:text-stone-100 tracking-tight">
+                <span className="text-2xl font-serif font-semibold text-stone-900 tracking-tight">
                   {domesticPrice}
                 </span>
               </div>
 
               {/* 副标题 - 淡雅 */}
-              <p className="text-xs text-stone-500/70 dark:text-stone-400/60 mt-1.5 font-light tracking-wide">
+              <p className="text-xs text-stone-500/70 mt-1.5 font-light tracking-wide">
                 由爱发电提供技术支持
               </p>
             </div>
@@ -131,13 +133,13 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
           {/* 箭头图标 - 极简 */}
           <div className={cn(
             "w-10 h-10 rounded-full flex items-center justify-center",
-            "bg-stone-100/80 dark:bg-stone-800/50",
-            "border border-stone-200/50 dark:border-stone-700/30",
-            "group-hover:bg-emerald-50/80 dark:group-hover:bg-emerald-900/30",
-            "group-hover:border-emerald-200/50 dark:group-hover:border-emerald-800/30",
+            "bg-stone-100/80",
+            "border border-stone-200/50",
+            "group-hover:bg-emerald-50/80",
+            "group-hover:border-emerald-200/50",
             "transition-all duration-500"
           )}>
-            <ArrowUpRight className="w-4 h-4 text-stone-500/70 dark:text-stone-400/60 group-hover:text-emerald-600/80 dark:group-hover:text-emerald-400/80 transition-colors duration-500" />
+            <ArrowUpRight className="w-4 h-4 text-stone-500/70 group-hover:text-emerald-600/80 transition-colors duration-500" />
           </div>
         </div>
       </motion.button>
@@ -155,9 +157,9 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
         className={cn(
           "w-full relative overflow-hidden",
           "rounded-2xl p-6",
-          "bg-white/40 dark:bg-black/40",
+          "bg-white/40",
           "backdrop-blur-md",
-          "border border-white/30 dark:border-white/10",
+          "border border-white/30",
           "shadow-sm hover:shadow-lg",
           "transition-all duration-500 ease-out",
           "group"
@@ -175,35 +177,35 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
             {/* 图标容器 - 极简圆形 */}
             <div className={cn(
               "w-14 h-14 rounded-full flex items-center justify-center",
-              "bg-amber-50/80 dark:bg-amber-950/30",
-              "border border-amber-200/50 dark:border-amber-800/30",
-              "group-hover:bg-amber-100/80 dark:group-hover:bg-amber-900/40",
+              "bg-amber-50/80",
+              "border border-amber-200/50",
+              "group-hover:bg-amber-100/80",
               "transition-all duration-500"
             )}>
-              <Globe className="w-6 h-6 text-amber-700/80 dark:text-amber-400/80 group-hover:scale-110 transition-transform duration-500" />
+              <Globe className="w-6 h-6 text-amber-700/80 group-hover:scale-110 transition-transform duration-500" />
             </div>
 
             {/* 文字内容 */}
             <div className="text-left">
               {/* 主标题 */}
               <div className="flex items-baseline gap-3">
-                <span className="text-base font-medium text-stone-800 dark:text-stone-200 tracking-wide">
+                <span className="text-base font-medium text-stone-800 tracking-wide">
                   Credit Card / PayPal
                 </span>
-                <span className="text-xs text-amber-700/60 dark:text-amber-400/60 font-light">
+                <span className="text-xs text-amber-700/60 font-light">
                   Patreon
                 </span>
               </div>
 
               {/* 价格 - 精致清晰 */}
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-serif font-semibold text-stone-900 dark:text-stone-100 tracking-tight">
+                <span className="text-2xl font-serif font-semibold text-stone-900 tracking-tight">
                   {internationalPrice}
                 </span>
               </div>
 
               {/* 副标题 - 淡雅 */}
-              <p className="text-xs text-stone-500/70 dark:text-stone-400/60 mt-1.5 font-light tracking-wide">
+              <p className="text-xs text-stone-500/70 mt-1.5 font-light tracking-wide">
                 Powered by Patreon
               </p>
             </div>
@@ -212,13 +214,13 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
           {/* 箭头图标 - 极简 */}
           <div className={cn(
             "w-10 h-10 rounded-full flex items-center justify-center",
-            "bg-stone-100/80 dark:bg-stone-800/50",
-            "border border-stone-200/50 dark:border-stone-700/30",
-            "group-hover:bg-amber-50/80 dark:group-hover:bg-amber-900/30",
-            "group-hover:border-amber-200/50 dark:group-hover:border-amber-800/30",
+            "bg-stone-100/80",
+            "border border-stone-200/50",
+            "group-hover:bg-amber-50/80",
+            "group-hover:border-amber-200/50",
             "transition-all duration-500"
           )}>
-            <ArrowUpRight className="w-4 h-4 text-stone-500/70 dark:text-stone-400/60 group-hover:text-amber-600/80 dark:group-hover:text-amber-400/80 transition-colors duration-500" />
+            <ArrowUpRight className="w-4 h-4 text-stone-500/70 group-hover:text-amber-600/80 transition-colors duration-500" />
           </div>
         </div>
       </motion.button>
@@ -231,18 +233,18 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
       */}
       <div className={cn(
         "mt-6 p-5 rounded-2xl",
-        "bg-stone-100/30 dark:bg-stone-900/30",
+        "bg-stone-100/30",
         "backdrop-blur-sm",
-        "border border-stone-200/30 dark:border-stone-700/20"
+        "border border-stone-200/30"
       )}>
         <div className="flex items-start gap-3">
           <div className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-            "bg-stone-200/50 dark:bg-stone-700/30"
+            "bg-stone-200/50"
           )}>
-            <CreditCard className="w-3.5 h-3.5 text-stone-500/70 dark:text-stone-400/60" />
+            <CreditCard className="w-3.5 h-3.5 text-stone-500/70" />
           </div>
-          <p className="text-xs text-stone-500/80 dark:text-stone-400/70 leading-relaxed pt-1.5 font-light">
+          <p className="text-xs text-stone-500/80 leading-relaxed pt-1.5 font-light">
             支付完成后，系统将在 1 分钟内自动为您点亮 Pro 状态。如有问题请联系客服。
           </p>
         </div>
