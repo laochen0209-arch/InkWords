@@ -218,6 +218,14 @@ const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
 // 所有支持的考试类型
 const ALL_EXAM_TYPES = ["IELTS", "TOEFL", "CET-4", "CET-6", "HSK", "BCT", "TOCFL"]
 
+// 【新增】根据目标语言的考试类型映射
+const EXAM_TYPES_BY_TARGET_LANG: Record<"en" | "zh", string[]> = {
+  // 学习英文（母语中文）-> 英文考试
+  en: ["IELTS", "TOEFL", "CET-4", "CET-6"],
+  // 学习中文（母语英文）-> 中文考试
+  zh: ["HSK", "TOCFL", "BCT"]
+}
+
 // 考试类型到语言轨道的映射
 const EXAM_TO_TRACK: Record<string, "en" | "zh"> = {
   IELTS: "en",
@@ -395,15 +403,20 @@ const InkRadar = ({ d, track }: { d: number[], track: "en" | "zh" }) => {
   )
 }
 
-// 考试类型选择器 - 支持所有考试类型
+// 考试类型选择器 - 根据目标语言过滤考试类型
 const ExamTypeSelector = ({ 
   currentType, 
-  onTypeChange 
+  onTypeChange,
+  targetLang
 }: { 
   currentType: string
-  onTypeChange: (type: string) => void 
+  onTypeChange: (type: string) => void
+  targetLang: "en" | "zh"
 }) => {
   const [isOpen, setIsOpen] = useState(false)
+
+  // 【修复】根据目标语言过滤考试类型
+  const availableExamTypes = EXAM_TYPES_BY_TARGET_LANG[targetLang] || ALL_EXAM_TYPES
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -429,7 +442,7 @@ const ExamTypeSelector = ({
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
           <div className="py-1">
-            {ALL_EXAM_TYPES.map((opt) => (
+            {availableExamTypes.map((opt) => (
               <button
                 key={opt}
                 onClick={() => {
@@ -634,14 +647,19 @@ interface UserStats {
 export default function PracticeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { learningMode, uiLanguage, switchMode } = useLanguage()
+  const { learningMode, uiLanguage, switchMode, targetLang } = useLanguage()
   const { user: authUser, isLoading: authLoading } = useAuth()
   const t = TRANSLATIONS[learningMode]
 
+  // 【修复】获取目标语言，用于过滤考试类型
+  const currentTargetLang = targetLang || "en"
+
   // 从 localStorage 获取上次选择的考试类型
   const getLastExamType = useCallback(() => {
-    return loadFromStorage(STORAGE_KEYS.LAST_EXAM_TYPE, "IELTS")
-  }, [])
+    // 【修复】根据目标语言返回默认考试类型
+    const defaultType = EXAM_TYPES_BY_TARGET_LANG[currentTargetLang]?.[0] || "IELTS"
+    return loadFromStorage(STORAGE_KEYS.LAST_EXAM_TYPE, defaultType)
+  }, [currentTargetLang])
 
   // 从 URL 获取当前考试类型，如果没有则从 localStorage 获取，最后使用默认值
   const urlType = searchParams.get("type")
@@ -747,6 +765,18 @@ export default function PracticeContent() {
   useEffect(() => {
     currentTypeRef.current = currentType;
   }, [currentType]);
+
+  // 【修复】当目标语言变化时，自动切换到对应的考试类型
+  useEffect(() => {
+    const validExamTypes = EXAM_TYPES_BY_TARGET_LANG[currentTargetLang] || []
+    // 如果当前考试类型不在目标语言对应的考试类型列表中，自动切换
+    if (!validExamTypes.includes(currentTypeRef.current) && validExamTypes.length > 0) {
+      const newType = validExamTypes[0]
+      console.log('[Practice] 目标语言变化，自动切换考试类型:', currentTargetLang, '->', newType)
+      currentTypeRef.current = newType
+      localStorage.setItem(STORAGE_KEYS.LAST_EXAM_TYPE, newType)
+    }
+  }, [currentTargetLang])
   
   // ============================================
   // 【修复】fetchUserStats - 依赖注入式数据获取
@@ -1193,6 +1223,7 @@ export default function PracticeContent() {
             <ExamTypeSelector 
               currentType={currentType} 
               onTypeChange={handleTypeChange}
+              targetLang={currentTargetLang}
             />
           </div>
           

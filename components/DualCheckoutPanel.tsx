@@ -144,10 +144,10 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
                   {/* 文字 */}
                   <div className="text-left">
-                    <span className="text-base font-medium text-[#D4AF37] tracking-wide">
+                    <span className="text-base font-medium text-white tracking-wide">
                       微信 / 支付宝
                     </span>
-                    <p className="text-xs text-[#D4AF37]/70 mt-0.5">
+                    <p className="text-xs text-white/70 mt-0.5">
                       爱发电支持
                     </p>
                   </div>
@@ -197,10 +197,10 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
                   {/* 文字 */}
                   <div className="text-left">
-                    <span className="text-base font-medium text-[#D4AF37] tracking-wide">
+                    <span className="text-base font-medium text-white tracking-wide">
                       Credit Card / PayPal
                     </span>
-                    <p className="text-xs text-[#D4AF37]/70 mt-0.5">
+                    <p className="text-xs text-white/70 mt-0.5">
                       Patreon支持
                     </p>
                   </div>
@@ -267,20 +267,20 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
               <div className="relative z-10 flex items-center justify-between pl-3">
                 <div className="text-left">
-                  <span className="text-base font-medium text-[#D4AF37]">
+                  <span className="text-base font-medium text-white">
                     {selectedMethod === "domestic" ? "月度会员" : "Monthly Plan"}
                   </span>
-                  <p className="text-xs text-[#D4AF37]/70 mt-1">
+                  <p className="text-xs text-white/70 mt-1">
                     {selectedMethod === "domestic" ? "按月付费，随时取消" : "Billed monthly, cancel anytime"}
                   </p>
                 </div>
 
                 {/* 价格 */}
                 <div className="text-right">
-                  <span className="text-2xl font-serif font-semibold text-[#D4AF37]">
+                  <span className="text-2xl font-serif font-semibold text-white">
                     {selectedMethod === "domestic" ? prices.domestic.month : prices.international.month}
                   </span>
-                  <span className="text-sm text-[#D4AF37]/70 ml-1">
+                  <span className="text-sm text-white/70 ml-1">
                     {selectedMethod === "domestic" ? "/月" : "/mo"}
                   </span>
                 </div>
@@ -318,20 +318,20 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
 
               <div className="relative z-10 flex items-center justify-between pl-3">
                 <div className="text-left">
-                  <span className="text-base font-medium text-[#D4AF37]">
+                  <span className="text-base font-medium text-white">
                     {selectedMethod === "domestic" ? "年度会员" : "Yearly Plan"}
                   </span>
-                  <p className="text-xs text-[#D4AF37]/70 mt-1">
+                  <p className="text-xs text-white/70 mt-1">
                     {selectedMethod === "domestic" ? "年付更优惠" : "Save with yearly billing"}
                   </p>
                 </div>
 
                 {/* 价格 */}
                 <div className="text-right">
-                  <span className="text-2xl font-serif font-semibold text-[#D4AF37]">
+                  <span className="text-2xl font-serif font-semibold text-white">
                     {selectedMethod === "domestic" ? prices.domestic.year : prices.international.year}
                   </span>
-                  <span className="text-sm text-[#D4AF37]/70 ml-1">
+                  <span className="text-sm text-white/70 ml-1">
                     {selectedMethod === "domestic" ? "/年" : "/yr"}
                   </span>
                 </div>
