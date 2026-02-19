@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { BottomNavBar } from "@/components/library/bottom-nav-bar"
 import { ProfileHeader } from "@/components/profile/profile-header"
 import { VipBanner } from "@/components/profile/vip-banner"
@@ -10,10 +10,9 @@ import { useLanguage } from "@/lib/contexts/language-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { DualCheckoutPanel } from "@/components/DualCheckoutPanel"
-import { Check, Crown, Sparkles, BookOpen, Library, Award } from "lucide-react"
+import { Crown, Sparkles, BookOpen, Library, Award } from "lucide-react"
 
 type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
-type PlanType = "monthly" | "yearly"
 
 /**
  * 个人中心页面
@@ -24,42 +23,15 @@ type PlanType = "monthly" | "yearly"
  * - VIP 状态显示和到期时间
  * - 设置列表
  * - 退出登录
- * - PayPal 支付开通 VIP（支持月度/年度套餐选择）
+ * - 双引擎支付开通 VIP（爱发电/Patreon）
  */
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile")
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>("monthly")
-  const [debugInfo, setDebugInfo] = useState<string>("")
   const toast = useToast()
   const { learningMode } = useLanguage()
   const { user, isVip, isAuthenticated } = useAuth()
 
   const t = TRANSLATIONS[learningMode]
-
-  // 【调试】输出用户信息
-  useEffect(() => {
-    console.log("[Profile Debug] user:", user)
-    console.log("[Profile Debug] isVip:", isVip)
-    console.log("[Profile Debug] user?.is_pro:", user?.is_pro)
-    console.log("[Profile Debug] user?.subscription_status:", user?.subscription_status)
-    setDebugInfo(`isVip=${isVip}, is_pro=${user?.is_pro}, status=${user?.subscription_status}`)
-  }, [user, isVip])
-
-  // 套餐配置
-  const plans = {
-    monthly: {
-      price: "3.99",
-      label: "月度会员",
-      subLabel: "$3.99/月",
-      savings: null,
-    },
-    yearly: {
-      price: "39.90",
-      label: "年度会员",
-      subLabel: "$39.9/年",
-      savings: "省 $7.98",
-    },
-  }
 
   // VIP 特权列表
   const vipBenefits = [
@@ -94,15 +66,6 @@ export default function ProfilePage() {
           <div className="w-full max-w-2xl mx-auto">
             <ProfileHeader />
 
-            {/* 【调试】显示 VIP 状态信息 */}
-            {user?.id && (
-              <div className="w-full px-4 mb-2">
-                <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-2 text-xs text-yellow-800">
-                  <strong>DEBUG:</strong> {debugInfo}
-                </div>
-              </div>
-            )}
-
             {/* VIP Banner - 已登录用户显示升级按钮或VIP状态 */}
             {user?.id && !isVip ? (
               <div className="w-full px-4 mb-4">
@@ -133,72 +96,22 @@ export default function ProfilePage() {
                       </p>
                     </div>
 
-                    {/* VIP 特权列表 - 居中对齐 */}
+                    {/* VIP 特权列表 - 单列居中布局 */}
                     <div className="flex flex-col items-center gap-3 mb-6">
                       {vipBenefits.map((benefit, index) => (
-                        <div key={index} className="flex items-center gap-2 text-[#FDFBF7]/80 text-sm">
+                        <div key={index} className="flex items-center gap-3 text-[#FDFBF7]/90 text-sm">
                           <benefit.icon className="w-4 h-4 text-[#D4AF37]" />
                           <span>{benefit.text}</span>
                         </div>
                       ))}
                     </div>
 
-                    {/* 套餐选择卡片 */}
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      {/* 月度套餐 */}
-                      <button
-                        onClick={() => setSelectedPlan("monthly")}
-                        className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
-                          selectedPlan === "monthly"
-                            ? "border-[#D4AF37] bg-[#D4AF37]/10"
-                            : "border-[#FDFBF7]/20 hover:border-[#FDFBF7]/40 bg-[#FDFBF7]/5"
-                        }`}
-                      >
-                        <div className="text-center">
-                          <div className="font-medium text-[#FDFBF7] text-sm mb-1">{plans.monthly.label}</div>
-                          <div className="text-2xl font-bold text-[#D4AF37]">{plans.monthly.price}</div>
-                          <div className="text-xs text-[#FDFBF7]/60">USD/月</div>
-                        </div>
-                        {selectedPlan === "monthly" && (
-                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#D4AF37] rounded-full flex items-center justify-center">
-                            <Check className="w-3 h-3 text-[#2B2B2B]" />
-                          </div>
-                        )}
-                      </button>
-
-                      {/* 年度套餐 */}
-                      <button
-                        onClick={() => setSelectedPlan("yearly")}
-                        className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
-                          selectedPlan === "yearly"
-                            ? "border-[#D4AF37] bg-[#D4AF37]/10"
-                            : "border-[#FDFBF7]/20 hover:border-[#FDFBF7]/40 bg-[#FDFBF7]/5"
-                        }`}
-                      >
-                        <div className="text-center">
-                          <div className="font-medium text-[#FDFBF7] text-sm mb-1">{plans.yearly.label}</div>
-                          <div className="text-2xl font-bold text-[#D4AF37]">{plans.yearly.price}</div>
-                          <div className="text-xs text-[#FDFBF7]/60">USD/年</div>
-                          {plans.yearly.savings && (
-                            <div className="inline-block mt-2 px-2 py-0.5 bg-[#D4AF37]/20 text-[#D4AF37] text-xs rounded-full font-medium">
-                              🔥 {plans.yearly.savings}
-                            </div>
-                          )}
-                        </div>
-                        {selectedPlan === "yearly" && (
-                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#D4AF37] rounded-full flex items-center justify-center">
-                            <Check className="w-3 h-3 text-[#2B2B2B]" />
-                          </div>
-                        )}
-                      </button>
-                    </div>
-
                     {/* 双引擎收银台 */}
                     <div className="bg-white/5 rounded-xl p-4">
                       <DualCheckoutPanel 
                         userId={user.id} 
-                        planType={selectedPlan === "monthly" ? "month" : "year"}
-                        price={plans[selectedPlan].price}
+                        planType="month"
+                        price="9.9"
                       />
                     </div>
 
