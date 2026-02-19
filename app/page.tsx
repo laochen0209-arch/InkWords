@@ -14,7 +14,10 @@ export default function OnboardingPage() {
   const router = useRouter()
 
   const handleSelect = (langId: string) => {
-    localStorage.setItem('pref_lang', langId)
+    // 将 id 映射为 LearningMode
+    // "en" 表示学中文（母语英文），"zh" 表示学英文（母语文）
+    const learningMode = langId === "en" ? "LEARN_CHINESE" : "LEARN_ENGLISH"
+    localStorage.setItem('inkwords_learning_mode', learningMode)
     router.push("/auth")
   }
 

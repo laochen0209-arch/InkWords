@@ -46,8 +46,17 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
   /**
    * 初始化语言设置
    * 【修复】学习语言和 UI 语言分别从不同的 localStorage key 读取
+   * 【兼容】处理旧版本 pref_lang
    */
   useEffect(() => {
+    // 兼容旧版本 pref_lang
+    const prefLang = localStorage.getItem('pref_lang')
+    if (prefLang && !localStorage.getItem('inkwords_learning_mode')) {
+      const mode = prefLang === "en" ? "LEARN_CHINESE" : "LEARN_ENGLISH"
+      localStorage.setItem('inkwords_learning_mode', mode)
+      localStorage.removeItem('pref_lang') // 清理旧数据
+    }
+
     const settings = getLanguageSettings()
     
     // 读取学习模式（独立存储）
