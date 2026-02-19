@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { BookOpen, Globe, Eye, EyeOff } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/contexts/language-context"
 
 const langs = [
   { id: "en", label: "中文", sub: "MANDARIN", icon: BookOpen },
@@ -12,16 +13,15 @@ const langs = [
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const { switchMode } = useLanguage()
 
   const handleSelect = (langId: string) => {
     // 将 id 映射为 LearningMode
     // "en" 表示学中文（母语英文），"zh" 表示学英文（母语文）
     const learningMode = langId === "en" ? "LEARN_CHINESE" : "LEARN_ENGLISH"
     
-    // 确保在客户端执行
-    if (typeof window !== "undefined") {
-      localStorage.setItem('inkwords_learning_mode', learningMode)
-    }
+    // 【修复】使用 switchMode 函数来确保所有语言状态正确同步
+    switchMode(learningMode)
     
     router.push("/auth")
   }

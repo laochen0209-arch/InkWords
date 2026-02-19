@@ -28,17 +28,18 @@ type TabType = "home" | "practice" | "library" | "profile" | "study" | "checkin"
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile")
   const toast = useToast()
-  const { learningMode } = useLanguage()
+  const { learningMode, uiLanguage } = useLanguage()
   const { user, isVip, isAuthenticated } = useAuth()
 
   const t = TRANSLATIONS[learningMode]
+  const isZh = uiLanguage === 'zh'
 
   // VIP 特权列表
   const vipBenefits = [
-    { icon: BookOpen, text: "无限学习单词和句子" },
-    { icon: Library, text: "解锁所有图书馆资源" },
-    { icon: Award, text: "专属练习模式和考试" },
-    { icon: Sparkles, text: "优先客服支持" },
+    { icon: BookOpen, text: isZh ? "无限学习单词和句子" : "Unlimited Words & Sentences" },
+    { icon: Library, text: isZh ? "解锁所有图书馆资源" : "Unlock Full Library" },
+    { icon: Award, text: isZh ? "专属练习模式和考试" : "Exclusive Practice & Exams" },
+    { icon: Sparkles, text: isZh ? "优先客服支持" : "Priority Support" },
   ]
 
   const handleLogout = () => {
@@ -89,10 +90,10 @@ export default function ProfilePage() {
                         <Crown className="w-8 h-8 text-[#D4AF37]" />
                       </div>
                       <h3 className="text-xl font-serif font-medium text-[#FDFBF7] mb-1">
-                        开通 Pro 会员
+                        {isZh ? "开通 Pro 会员" : "Go Pro"}
                       </h3>
                       <p className="text-sm text-[#FDFBF7]/60">
-                        解锁全部特权，畅享学习之旅
+                        {isZh ? "解锁全部特权，畅享学习之旅" : "Unlock all features and enjoy your learning"}
                       </p>
                     </div>
 
@@ -117,7 +118,7 @@ export default function ProfilePage() {
 
                     {/* 安全提示 */}
                     <p className="text-center text-xs text-[#FDFBF7]/40 mt-4">
-                      安全支付 · 随时取消 · 7天无理由退款
+                      {isZh ? "安全支付 · 随时取消 · 7天无理由退款" : "Secure Payment · Cancel Anytime · 7-Day Refund"}
                     </p>
                   </div>
                 </div>

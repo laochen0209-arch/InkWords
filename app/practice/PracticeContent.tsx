@@ -741,9 +741,9 @@ export default function PracticeContent() {
     } finally {
       setExamsLoading(false)
     }
-  }, []) // 【修复】移除 currentType 依赖，通过参数传入
+  }, [supabase]) // 【修复】添加 supabase 依赖
 
-  // 【修复】组件挂载时获取试卷列表 - 只执行一次
+  // 【修复】组件挂载时和 currentType 变化时获取试卷列表
   useEffect(() => {
     let mounted = true
     
@@ -754,7 +754,7 @@ export default function PracticeContent() {
     return () => {
       mounted = false
     }
-  }, []) // 【修复】空依赖数组，只在挂载时执行
+  }, [currentType, fetchExams]) // 【修复】添加 currentType 和 fetchExams 依赖
 
   // ============================================
   // 【严格重构】使用 useRef 持久化存储 currentType
@@ -1472,7 +1472,7 @@ export default function PracticeContent() {
                   locked={false}
                 />
                 <FeatureCard
-                  href="#"
+                  href="/practice/review"
                   icon={History}
                   title={uiLanguage === 'zh' ? '错题本' : 'Mistake Bank'}
                   subtitle={uiLanguage === 'zh' ? 'Review' : 'Review'}
