@@ -69,8 +69,12 @@ export function checkIsVip(
   currentPeriodEnd: string | null | undefined = null,
   isPro: boolean | null | undefined = false
 ): boolean {
+  // 【调试】输出判断参数
+  console.log("[checkIsVip Debug] isPro:", isPro, "subscriptionStatus:", subscriptionStatus)
+
   // 如果 is_pro 为 true，直接判定为 VIP
-  if (isPro) {
+  if (isPro === true) {
+    console.log("[checkIsVip Debug] VIP by is_pro")
     return true
   }
 
@@ -78,6 +82,7 @@ export function checkIsVip(
   const hasValidStatus = vipStatuses.includes((subscriptionStatus || '').toLowerCase())
 
   if (!hasValidStatus) {
+    console.log("[checkIsVip Debug] NOT VIP - invalid status")
     return false
   }
 
@@ -85,10 +90,13 @@ export function checkIsVip(
   if (currentPeriodEnd) {
     const expiryDate = new Date(currentPeriodEnd)
     const now = new Date()
-    return expiryDate > now
+    const isValid = expiryDate > now
+    console.log("[checkIsVip Debug] VIP by status, expiry valid:", isValid)
+    return isValid
   }
 
   // 如果没有设置到期时间，视为有效会员
+  console.log("[checkIsVip Debug] VIP by status (no expiry)")
   return true
 }
 
@@ -177,8 +185,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (error) {
+        console.error("[Auth] 获取用户资料失败:", error)
         return null
       }
+
+      // 【调试】输出原始数据
+      console.log("[Auth Debug] userData from DB:", userData)
+      console.log("[Auth Debug] is_pro value:", userData?.is_pro)
+      console.log("[Auth Debug] is_pro type:", typeof userData?.is_pro)
 
       const user: User = {
         id: authUser.id,
@@ -193,8 +207,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         library_daily_count: userData?.library_daily_count || 0,
         practice_tickets: userData?.practice_tickets || 0,
         streak: userData?.streak || 0,
-        is_pro: userData?.is_pro || false
+        is_pro: userData?.is_pro === true  // 确保只有 true 才是 true
       }
+
+      console.log("[Auth Debug] constructed user.is_pro:", user.is_pro)
 
       cache.set(cacheKey, user, 30000)
       
