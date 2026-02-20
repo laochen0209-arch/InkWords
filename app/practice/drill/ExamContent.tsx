@@ -706,85 +706,82 @@ export default function ExamContent({ examId }: ExamContentProps) {
         
         if (!response.ok) {
           console.error('[Exam] API 返回错误:', result.error);
-          return
+          throw new Error(result.message || '获取试卷失败')
         }
 
         const allExams = result.data || []
-      
-      // 过滤掉当前试卷，避免重复
-      const availableExams = allExams.filter(e => e.id !== exam?.id) || allExams
-      
-      // 随机选择一套试卷
-      const examsToChoose = availableExams?.length > 0 ? availableExams : allExams
-      if (examsToChoose && examsToChoose.length > 0) {
-        const randomIndex = Math.floor(Math.random() * examsToChoose.length)
-        const selectedExam = examsToChoose[randomIndex]
         
-        // 【关键修复】解析试卷数据，包括嵌套的 questions
-        let sections: Section[] = [];
-        if (selectedExam.sections) {
-          try {
-            const parsedSections = typeof selectedExam.sections === 'string' 
-              ? JSON.parse(selectedExam.sections) 
-              : selectedExam.sections;
-            
-            // 【关键修复】递归解析每个 section 的 questions
-            sections = parsedSections.map((section: any) => {
-              let questions: Question[] = [];
-              if (section.questions) {
-                try {
-                  questions = typeof section.questions === 'string'
-                    ? JSON.parse(section.questions)
-                    : section.questions;
-                  
-                  // 【关键修复】确保每个 question 的 options 也被解析
-                  questions = questions.map((q: any) => ({
-                    ...q,
-                    options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
-                    // 确保 type 字段存在
-                    type: q.type || 'multiple_choice'
-                  }));
-                } catch (e) {
-                  console.error('[Exam] 解析 questions 失败:', e);
-                }
-              }
+        // 过滤掉当前试卷，避免重复
+        const availableExams = allExams.filter(e => e.id !== exam?.id) || allExams
+        
+        // 随机选择一套试卷
+        const examsToChoose = availableExams?.length > 0 ? availableExams : allExams
+        if (examsToChoose && examsToChoose.length > 0) {
+          const randomIndex = Math.floor(Math.random() * examsToChoose.length)
+          const selectedExam = examsToChoose[randomIndex]
+          
+          // 【关键修复】解析试卷数据，包括嵌套的 questions
+          let sections: Section[] = [];
+          if (selectedExam.sections) {
+            try {
+              const parsedSections = typeof selectedExam.sections === 'string' 
+                ? JSON.parse(selectedExam.sections) 
+                : selectedExam.sections;
               
-              return {
-                ...section,
-                questions: questions || []
-              };
-            });
-          } catch (e) {
-            console.error('[Exam] 解析试卷 sections 失败:', e);
+              // 【关键修复】递归解析每个 section 的 questions
+              sections = parsedSections.map((section: any) => {
+                let questions: Question[] = [];
+                if (section.questions) {
+                  try {
+                    questions = typeof section.questions === 'string'
+                      ? JSON.parse(section.questions)
+                      : section.questions;
+                    
+                    // 【关键修复】确保每个 question 的 options 也被解析
+                    questions = questions.map((q: any) => ({
+                      ...q,
+                      options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+                      // 确保 type 字段存在
+                      type: q.type || 'multiple_choice'
+                    }));
+                  } catch (e) {
+                    console.error('[Exam] 解析 questions 失败:', e);
+                  }
+                }
+                
+                return {
+                  ...section,
+                  questions: questions || []
+                };
+              });
+            } catch (e) {
+              console.error('[Exam] 解析试卷 sections 失败:', e);
+            }
           }
+          
+          // 更新试卷状态
+          setExam({
+            id: selectedExam.id,
+            exam_type: selectedExam.exam_type,
+            sections: sections,
+            created_at: selectedExam.created_at
+          });
+          
+          // 重置计时器
+          setTimeRemaining(getExamDuration(currentType) * 60);
+          setIsTimerRunning(false);
+          
+          console.log('[Exam] 已加载新试卷:', selectedExam.id, 'sections:', sections.length);
+        } else {
+          alert('暂无可用试卷');
         }
-        
-        // 更新试卷状态
-        setExam({
-          id: selectedExam.id,
-          exam_type: selectedExam.exam_type,
-          sections: sections,
-          created_at: selectedExam.created_at
-        });
-        
-        // 重置计时器
-        setTimeRemaining(getExamDuration(currentType) * 60);
-        setIsTimerRunning(false);
-        
-        console.log('[Exam] 已加载新试卷:', selectedExam.id, 'sections:', sections.length);
-      } else {
-        alert('暂无可用试卷');
-      }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+      } catch (error: any) {
         console.error('[Exam] 加载新试卷失败:', error);
-        alert('加载试卷失败，请重试');
+      } finally {
+        setIsSubmittingPractice(false);
+        setLoading(false);
       }
-    } finally {
-      setIsSubmittingPractice(false);
-      setLoading(false);
     }
-  };
 
   if (loading) return (
     <>
