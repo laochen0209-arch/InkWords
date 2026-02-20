@@ -236,7 +236,6 @@ export default function ExamContent({ examId }: ExamContentProps) {
             .select("*")
             .eq("id", examId)
             .single()
-            .abortSignal(abortControllerRef.current!.signal);
 
           if (specificError) {
             console.error('[Exam] 获取特定试卷失败:', specificError);
@@ -253,7 +252,6 @@ export default function ExamContent({ examId }: ExamContentProps) {
             .select("*")
             .eq("exam_type", currentType)
             .order("created_at", { ascending: false })
-            .abortSignal(abortControllerRef.current!.signal);
 
           if (fetchError) {
             if (fetchError.name !== 'AbortError') {
