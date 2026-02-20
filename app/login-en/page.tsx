@@ -17,10 +17,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     const mode = localStorage.getItem("inkwords_learning_mode") as LearningMode
+    // 【修复】登录页面语言与学习语言相反
+    // 学习英文 -> 中文界面（母语为中文的人学英文）
+    // 学习中文 -> 英文界面（母语为英文的人学中文）
     if (mode === "LEARN_CHINESE") {
-      setLearningMode("LEARN_CHINESE")
-    } else {
       setLearningMode("LEARN_ENGLISH")
+    } else {
+      setLearningMode("LEARN_CHINESE")
     }
   }, [])
 

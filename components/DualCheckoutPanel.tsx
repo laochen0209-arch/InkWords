@@ -104,7 +104,7 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
           >
             {/* 标题提示 */}
             <p className="text-center text-sm text-[#FDFBF7]/60 mb-4">
-              请选择支付方式
+              Select Payment Method
             </p>
 
             {/* 国内支付 - 微信/支付宝 */}
@@ -145,10 +145,10 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
                   {/* 文字 */}
                   <div className="text-left">
                     <span className="text-base font-medium text-white tracking-wide">
-                      微信 / 支付宝
+                      WeChat / Alipay
                     </span>
                     <p className="text-xs text-white/70 mt-0.5">
-                      爱发电支持
+                      Powered by Afdian
                     </p>
                   </div>
                 </div>
@@ -201,7 +201,7 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
                       Credit Card / PayPal
                     </span>
                     <p className="text-xs text-white/70 mt-0.5">
-                      Patreon支持
+                      Powered by Patreon
                     </p>
                   </div>
                 </div>
@@ -357,7 +357,7 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
             <CreditCard className="w-3.5 h-3.5 text-[#D4AF37]" />
           </div>
           <p className="text-xs text-[#D4AF37]/80 leading-relaxed pt-1.5">
-            支付完成后，系统将在 1 分钟内自动为您点亮 Pro 状态。如有问题请联系客服。
+            After payment, your Pro status will be activated automatically within 1 minute. Contact support if you have any questions.
           </p>
         </div>
       </div>
