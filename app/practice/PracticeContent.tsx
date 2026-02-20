@@ -647,7 +647,7 @@ interface UserStats {
 export default function PracticeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { learningMode, uiLanguage, switchMode, targetLang } = useLanguage()
+  const { learningMode, uiLanguage, switchMode, switchUiLanguage, targetLang } = useLanguage()
   const { user: authUser, isLoading: authLoading } = useAuth()
   const t = TRANSLATIONS[learningMode]
 
@@ -760,7 +760,7 @@ export default function PracticeContent() {
   // 【严格重构】使用 useRef 持久化存储 currentType
   // ============================================
   const currentTypeRef = useRef<string>(currentType);
-  
+
   // 同步 ref 与 state
   useEffect(() => {
     currentTypeRef.current = currentType;
@@ -777,6 +777,19 @@ export default function PracticeContent() {
       localStorage.setItem(STORAGE_KEYS.LAST_EXAM_TYPE, newType)
     }
   }, [currentTargetLang])
+
+  // 【新增】根据当前考试类型同步 UI 语言
+  // 中文考试 -> 英文界面，英文考试 -> 中文界面
+  useEffect(() => {
+    const isChineseExam = ['HSK', 'BCT', 'TOCFL'].includes(currentType)
+    const expectedUiLang = isChineseExam ? 'en' : 'zh'
+
+    // 只有当 UI 语言与期望不一致时才切换
+    if (uiLanguage !== expectedUiLang) {
+      console.log('[Practice] 同步 UI 语言:', uiLanguage, '->', expectedUiLang)
+      switchUiLanguage(expectedUiLang)
+    }
+  }, [currentType, uiLanguage, switchUiLanguage])
   
   // ============================================
   // 【修复】fetchUserStats - 依赖注入式数据获取
@@ -1174,9 +1187,15 @@ export default function PracticeContent() {
     // IELTS、TOEFL、CET-4、CET-6 是英文考试 -> LEARN_ENGLISH
     const isChineseExam = ['HSK', 'BCT', 'TOCFL'].includes(newType)
     const newMode = isChineseExam ? 'LEARN_CHINESE' : 'LEARN_ENGLISH'
-    
+
     // 切换语言模式
     switchMode(newMode)
+
+    // 【修复】UI 语言与考试类型语言相反
+    // 中文考试(HSK/BCT/TOCFL) -> 英文界面
+    // 英文考试(IELTS/TOEFL/CET-4/CET-6) -> 中文界面
+    const newUiLang = isChineseExam ? 'en' : 'zh'
+    switchUiLanguage(newUiLang)
     
     // 【修复】只使用 replaceState 更新 URL，不触发 router.push
     // 这样可以避免页面重新加载导致的循环
@@ -1189,7 +1208,7 @@ export default function PracticeContent() {
     fetchExams(newType)
     // 【关键修复】使用 ref 调用 fetchUserStats
     fetchUserStatsRef.current()
-  }, [switchMode]) // 【修复】移除 router 和 searchParams 依赖
+  }, [switchMode, switchUiLanguage]) // 【修复】移除 router 和 searchParams 依赖
 
   // 生成功能卡片的链接（带 type 参数）
   const getLinkWithType = (path: string) => {

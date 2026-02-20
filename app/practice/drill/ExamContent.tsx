@@ -114,7 +114,11 @@ const EXAM_DURATIONS: Record<string, number> = {
 const getExamDuration = (examType: string): number => EXAM_DURATIONS[examType] || 60;
 
 // --- 主组件 ---
-export default function ExamContent() {
+interface ExamContentProps {
+  examId?: string;
+}
+
+export default function ExamContent({ examId }: ExamContentProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -220,57 +224,80 @@ export default function ExamContent() {
           return;
         }
 
-        console.log('[Exam] 开始获取试卷:', { currentType, networkStatus: navigator.onLine ? 'online' : 'offline' });
+        console.log('[Exam] 开始获取试卷:', { currentType, examId, networkStatus: navigator.onLine ? 'online' : 'offline' });
 
-        const { data: allExams, error: fetchError } = await supabase
-          .from("mock_exams")
-          .select("*")
-          .eq("exam_type", currentType)
-          .order("created_at", { ascending: false })
-          .abortSignal(abortControllerRef.current!.signal);
+        let data: any = null;
 
-        if (fetchError) {
-          if (fetchError.name !== 'AbortError') {
-            // 【修复】添加详细的错误日志
-            console.error('[Exam] 获取失败详情:', {
-              error: fetchError,
-              message: fetchError.message,
-              code: fetchError.code,
-              details: fetchError.details,
-              hint: fetchError.hint,
-              currentType: currentType,
-              networkStatus: navigator.onLine ? 'online' : 'offline'
-            });
+        // 【修复】如果提供了 examId，优先加载特定试卷
+        if (examId) {
+          console.log('[Exam] 通过 examId 加载特定试卷:', examId);
+          const { data: specificExam, error: specificError } = await supabase
+            .from("mock_exams")
+            .select("*")
+            .eq("id", examId)
+            .single()
+            .abortSignal(abortControllerRef.current!.signal);
+
+          if (specificError) {
+            console.error('[Exam] 获取特定试卷失败:', specificError);
+          } else if (specificExam) {
+            data = specificExam;
+            console.log('[Exam] 成功加载特定试卷:', data.id);
+          }
+        }
+
+        // 如果没有提供 examId 或加载特定试卷失败，则按原来的逻辑获取
+        if (!data) {
+          const { data: allExams, error: fetchError } = await supabase
+            .from("mock_exams")
+            .select("*")
+            .eq("exam_type", currentType)
+            .order("created_at", { ascending: false })
+            .abortSignal(abortControllerRef.current!.signal);
+
+          if (fetchError) {
+            if (fetchError.name !== 'AbortError') {
+              // 【修复】添加详细的错误日志
+              console.error('[Exam] 获取失败详情:', {
+                error: fetchError,
+                message: fetchError.message,
+                code: fetchError.code,
+                details: fetchError.details,
+                hint: fetchError.hint,
+                currentType: currentType,
+                networkStatus: navigator.onLine ? 'online' : 'offline'
+              });
+              
+              // 用户友好的错误提示
+              const errorMsg = fetchError.message || '未知错误';
+              alert(`获取试卷失败: ${errorMsg}\n\n请检查:\n1. 网络连接是否正常\n2. 重新登录后再试`);
+            }
+            setLoading(false);
+            return;
+          }
+
+          // 【修复】更严格的试卷有效性检查 - 确保 sections 包含有效的 questions
+          const validExams = (allExams || []).filter((e: any) => {
+            // 检查旧格式 questions
+            if (e.questions && e.questions.length > 0) return true;
             
-            // 用户友好的错误提示
-            const errorMsg = fetchError.message || '未知错误';
-            alert(`获取试卷失败: ${errorMsg}\n\n请检查:\n1. 网络连接是否正常\n2. 重新登录后再试`);
+            // 检查新格式 sections - 需要至少一个 section 包含 questions
+            if (e.sections && e.sections.length > 0) {
+              const sections = typeof e.sections === "string" ? JSON.parse(e.sections) : e.sections;
+              return sections.some((s: any) => s.questions && s.questions.length > 0);
+            }
+            return false;
+          });
+
+          if (validExams.length === 0) {
+            console.error('[Exam] 没有找到有效的试卷数据');
+            setExam(null);
+            setLoading(false);
+            return;
           }
-          setLoading(false);
-          return;
-        }
 
-        // 【修复】更严格的试卷有效性检查 - 确保 sections 包含有效的 questions
-        const validExams = (allExams || []).filter((e: any) => {
-          // 检查旧格式 questions
-          if (e.questions && e.questions.length > 0) return true;
-          
-          // 检查新格式 sections - 需要至少一个 section 包含 questions
-          if (e.sections && e.sections.length > 0) {
-            const sections = typeof e.sections === "string" ? JSON.parse(e.sections) : e.sections;
-            return sections.some((s: any) => s.questions && s.questions.length > 0);
-          }
-          return false;
-        });
-
-        if (validExams.length === 0) {
-          console.error('[Exam] 没有找到有效的试卷数据');
-          setExam(null);
-          setLoading(false);
-          return;
-        }
-
-        const data = validExams[0]; 
+          data = validExams[0];
+        } 
 
         // 解析 Sections
         let sections: Section[] = [];
@@ -388,7 +415,7 @@ export default function ExamContent() {
       }
     }
     fetchExam();
-  }, [currentType]);
+  }, [currentType, examId]);
 
   // 倒计时
   useEffect(() => {

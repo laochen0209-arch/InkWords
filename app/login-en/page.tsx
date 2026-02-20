@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ink-toast/toast-context"
+import { TRANSLATIONS, LearningMode } from "@/lib/i18n"
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("")
@@ -12,6 +13,19 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const toast = useToast()
+  const [learningMode, setLearningMode] = useState<LearningMode>("LEARN_ENGLISH")
+
+  useEffect(() => {
+    const mode = localStorage.getItem("inkwords_learning_mode") as LearningMode
+    if (mode === "LEARN_CHINESE") {
+      setLearningMode("LEARN_CHINESE")
+    } else {
+      setLearningMode("LEARN_ENGLISH")
+    }
+  }, [])
+
+  const t = TRANSLATIONS[learningMode]
+  const isChineseMode = learningMode === "LEARN_CHINESE"
 
   const handleGetCode = () => {
     if (countdown > 0 || !phone) return
@@ -31,7 +45,7 @@ export default function LoginPage() {
     e.preventDefault()
     
     if (!phone || !code) {
-      toast.error("Please enter phone number and verification code")
+      toast.error(isChineseMode ? "请输入手机号和验证码" : "Please enter phone number and verification code")
       return
     }
     
@@ -40,7 +54,7 @@ export default function LoginPage() {
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      toast.success("Login successful!")
+      toast.success(isChineseMode ? "登录成功！" : "Login successful!")
       
       localStorage.setItem("isLoggedIn", "true")
       
@@ -49,7 +63,7 @@ export default function LoginPage() {
       }, 500)
     } catch (error) {
       console.error("Login failed:", error)
-      toast.error("Login failed, please try again")
+      toast.error(isChineseMode ? "登录失败，请重试" : "Login failed, please try again")
       setIsLoading(false)
     }
   }
@@ -92,7 +106,7 @@ export default function LoginPage() {
               </div>
             </div>
             <p className="mt-3 text-sm text-ink-gray font-serif tracking-widest">
-              Cultivate with peace, cherish every word
+              {isChineseMode ? "静心修习，惜字如金" : "Cultivate with peace, cherish every word"}
             </p>
           </header>
           
@@ -101,19 +115,23 @@ export default function LoginPage() {
             onSubmit={handleLogin}
           >
             <div className="space-y-2">
-              <label htmlFor="phone" className="sr-only">Phone Number</label>
+              <label htmlFor="phone" className="sr-only">
+                {isChineseMode ? "手机号" : "Phone Number"}
+              </label>
               <input
                 id="phone"
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Enter phone number"
+                placeholder={isChineseMode ? "请输入手机号" : "Enter phone number"}
                 className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
                 autoComplete="tel"
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="code" className="sr-only">Verification Code</label>
+              <label htmlFor="code" className="sr-only">
+                {isChineseMode ? "验证码" : "Verification Code"}
+              </label>
               <div className="relative">
                 <input
                   id="code"
@@ -121,7 +139,7 @@ export default function LoginPage() {
                   inputMode="numeric"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="Enter verification code"
+                  placeholder={isChineseMode ? "请输入验证码" : "Enter verification code"}
                   maxLength={6}
                   className="w-full bg-transparent border-0 border-b border-stone-300 rounded-none px-0 py-3 pr-24 text-ink-black font-serif placeholder:text-ink-gray/50 focus:outline-none focus:border-ink-vermilion focus:ring-0 transition-colors"
                   autoComplete="one-time-code"
@@ -132,7 +150,7 @@ export default function LoginPage() {
                   disabled={countdown > 0 || !phone}
                   className="absolute right-0 top-1/2 -translate-y-1/2 text-sm font-serif text-ink-vermilion hover:text-ink-vermilion/80 disabled:text-ink-gray/40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {countdown > 0 ? `${countdown}s` : "Get Code"}
+                  {countdown > 0 ? `${countdown}s` : (isChineseMode ? "获取验证码" : "Get Code")}
                 </button>
               </div>
             </div>
@@ -141,32 +159,36 @@ export default function LoginPage() {
               disabled={!phone || !code || isLoading}
               className="w-full mt-8 py-3.5 bg-[#C23E32] text-white font-serif text-base tracking-wider rounded-full shadow-md hover:bg-[#A33428] disabled:bg-ink-gray/30 disabled:shadow-none disabled:cursor-not-allowed transition-all duration-200"
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? (isChineseMode ? "登录中..." : "Logging in...") : (isChineseMode ? "登录" : "Login")}
             </button>
           </form>
           
           <footer className="mt-8 flex items-center justify-center gap-4 text-xs text-ink-gray/60">
             <button 
               type="button"
-              onClick={() => toast.info("WeChat login in development")}
+              onClick={() => toast.info(isChineseMode ? "微信登录开发中" : "WeChat login in development")}
               className="hover:text-ink-gray transition-colors font-serif"
             >
-              WeChat Login
+              {isChineseMode ? "微信登录" : "WeChat Login"}
             </button>
             <span className="text-stone-300">|</span>
             <Link 
               href="/"
               className="hover:text-ink-gray transition-colors font-serif"
             >
-              Browse First
+              {isChineseMode ? "先逛逛" : "Browse First"}
             </Link>
           </footer>
           
           <p className="mt-6 text-center text-xs text-ink-gray/40 font-serif leading-relaxed">
-            Logging in means you agree to
-            <button type="button" onClick={() => toast.info("User Agreement")} className="underline underline-offset-2 hover:text-ink-gray/60 transition-colors">User Agreement</button>
+            {isChineseMode ? "登录即同意" : "Logging in means you agree to"}
+            <button type="button" onClick={() => toast.info(isChineseMode ? "用户协议" : "User Agreement")} className="underline underline-offset-2 hover:text-ink-gray/60 transition-colors">
+              {isChineseMode ? "用户协议" : "User Agreement"}
+            </button>
             {" "}
-            <button type="button" onClick={() => toast.info("Privacy Policy")} className="underline underline-offset-2 hover:text-ink-gray/60 transition-colors">Privacy Policy</button>
+            <button type="button" onClick={() => toast.info(isChineseMode ? "隐私政策" : "Privacy Policy")} className="underline underline-offset-2 hover:text-ink-gray/60 transition-colors">
+              {isChineseMode ? "隐私政策" : "Privacy Policy"}
+            </button>
           </p>
         </div>
       </main>

@@ -221,7 +221,7 @@ export default function DashboardPage() {
               {authLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  加载中...
+                  Loading...
                 </>
               ) : isCheckingIn ? (
                 <>
