@@ -228,73 +228,66 @@ export default function ExamContent({ examId }: ExamContentProps) {
 
         let data: any = null;
 
-        // 【修复】如果提供了 examId，优先加载特定试卷
+        // 【修复】通过 API 路由加载试卷，绕过 GFW 阻断
         if (examId) {
           console.log('[Exam] 通过 examId 加载特定试卷:', examId);
-          const { data: specificExam, error: specificError } = await supabase
-            .from("mock_exams")
-            .select("*")
-            .eq("id", examId)
-            .single()
-
-          if (specificError) {
-            console.error('[Exam] 获取特定试卷失败:', specificError);
-          } else if (specificExam) {
-            data = specificExam;
-            console.log('[Exam] 成功加载特定试卷:', data.id);
+          try {
+            const response = await fetch(`/api/practice/exams?id=${encodeURIComponent(examId)}`)
+            const result = await response.json()
+            
+            if (!response.ok) {
+              console.error('[Exam] API 返回错误:', result.error);
+            } else if (result.data) {
+              data = result.data;
+              console.log('[Exam] 成功加载特定试卷:', data.id);
+            }
+          } catch (apiError) {
+            console.error('[Exam] API 请求失败:', apiError);
           }
         }
 
-        // 如果没有提供 examId 或加载特定试卷失败，则按原来的逻辑获取
+        // 如果没有提供 examId 或加载特定试卷失败，则按考试类型获取列表
         if (!data) {
-          const { data: allExams, error: fetchError } = await supabase
-            .from("mock_exams")
-            .select("*")
-            .eq("exam_type", currentType)
-            .order("created_at", { ascending: false })
-
-          if (fetchError) {
-            if (fetchError.name !== 'AbortError') {
-              // 【修复】添加详细的错误日志
-              console.error('[Exam] 获取失败详情:', {
-                error: fetchError,
-                message: fetchError.message,
-                code: fetchError.code,
-                details: fetchError.details,
-                hint: fetchError.hint,
-                currentType: currentType,
-                networkStatus: navigator.onLine ? 'online' : 'offline'
-              });
-              
-              // 用户友好的错误提示
-              const errorMsg = fetchError.message || '未知错误';
-              alert(`获取试卷失败: ${errorMsg}\n\n请检查:\n1. 网络连接是否正常\n2. 重新登录后再试`);
-            }
-            setLoading(false);
-            return;
-          }
-
-          // 【修复】更严格的试卷有效性检查 - 确保 sections 包含有效的 questions
-          const validExams = (allExams || []).filter((e: any) => {
-            // 检查旧格式 questions
-            if (e.questions && e.questions.length > 0) return true;
+          console.log('[Exam] 按考试类型获取试卷列表:', currentType);
+          try {
+            const response = await fetch(`/api/practice/exams?type=${encodeURIComponent(currentType)}`)
+            const result = await response.json()
             
-            // 检查新格式 sections - 需要至少一个 section 包含 questions
-            if (e.sections && e.sections.length > 0) {
-              const sections = typeof e.sections === "string" ? JSON.parse(e.sections) : e.sections;
-              return sections.some((s: any) => s.questions && s.questions.length > 0);
+            if (!response.ok) {
+              console.error('[Exam] API 返回错误:', result.error);
+              throw new Error(result.message || '数据加载失败，请稍后重试');
             }
-            return false;
-          });
 
-          if (validExams.length === 0) {
-            console.error('[Exam] 没有找到有效的试卷数据');
-            setExam(null);
+            if (!result.data || result.data.length === 0) {
+              console.error('[Exam] 没有找到有效的试卷数据');
+              setExam(null);
+              setLoading(false);
+              return;
+            }
+
+            // 更严格的试卷有效性检查
+            const validExams = result.data.filter((e: any) => {
+              if (e.questions && e.questions.length > 0) return true;
+              if (e.sections && e.sections.length > 0) {
+                const sections = typeof e.sections === "string" ? JSON.parse(e.sections) : e.sections;
+                return sections.some((s: any) => s.questions && s.questions.length > 0);
+              }
+              return false;
+            });
+
+            if (validExams.length === 0) {
+              console.error('[Exam] 没有找到有效的试卷数据');
+              setExam(null);
+              setLoading(false);
+              return;
+            }
+
+            data = validExams[0];
+          } catch (err: any) {
+            console.error('[Exam] 获取试卷失败:', err);
             setLoading(false);
             return;
           }
-
-          data = validExams[0];
         } 
 
         // 解析 Sections
@@ -706,28 +699,26 @@ export default function ExamContent({ examId }: ExamContentProps) {
         await consumePracticeTicket(1, authUser.id);
       }
       
-      // 重新获取试卷
-      const { data: allExams, error: fetchError } = await supabase
-        .from("mock_exams")
-        .select("*")
-        .eq("exam_type", currentType)
-        .order("created_at", { ascending: false })
-        .abortSignal(abortControllerRef.current!.signal);
+      // 【修复】通过 API 路由重新获取试卷
+      try {
+        const response = await fetch(`/api/practice/exams?type=${encodeURIComponent(currentType)}`)
+        const result = await response.json()
+        
+        if (!response.ok) {
+          console.error('[Exam] API 返回错误:', result.error);
+          return
+        }
 
-      if (fetchError) {
-        console.error('[Exam] 获取试卷失败:', fetchError);
-        alert('获取试卷失败，请重试');
-        return;
-      }
-
-      // 【修复】过滤掉当前试卷，避免重复
-      const availableExams = allExams?.filter(e => e.id !== exam?.id) || allExams;
+        const allExams = result.data || []
+      
+      // 过滤掉当前试卷，避免重复
+      const availableExams = allExams.filter(e => e.id !== exam?.id) || allExams
       
       // 随机选择一套试卷
-      const examsToChoose = availableExams?.length > 0 ? availableExams : allExams;
+      const examsToChoose = availableExams?.length > 0 ? availableExams : allExams
       if (examsToChoose && examsToChoose.length > 0) {
-        const randomIndex = Math.floor(Math.random() * examsToChoose.length);
-        const selectedExam = examsToChoose[randomIndex];
+        const randomIndex = Math.floor(Math.random() * examsToChoose.length)
+        const selectedExam = examsToChoose[randomIndex]
         
         // 【关键修复】解析试卷数据，包括嵌套的 questions
         let sections: Section[] = [];

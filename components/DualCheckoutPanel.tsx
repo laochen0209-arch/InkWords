@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { CreditCard, Globe, Heart, ArrowLeft, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/contexts/language-context"
+import { TRANSLATIONS, LearningMode } from "@/lib/i18n"
 
 /**
  * 双引擎收银台组件 - 两步式支付流程
@@ -39,6 +41,18 @@ type PaymentMethod = "domestic" | "international" | null
 export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanelProps) {
   const [step, setStep] = useState<PaymentStep>("select-method")
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>(null)
+  const [learningMode, setLearningMode] = useState<LearningMode>("LEARN_ENGLISH")
+
+  // 获取语言设置
+  useEffect(() => {
+    const savedMode = localStorage.getItem("inkwords_learning_mode") as LearningMode
+    if (savedMode) {
+      setLearningMode(savedMode)
+    }
+  }, [])
+
+  const t = TRANSLATIONS[learningMode]
+  const isChineseMode = learningMode === "LEARN_CHINESE"
 
   /**
    * 处理选择支付方式
@@ -104,7 +118,7 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
           >
             {/* 标题提示 */}
             <p className="text-center text-sm text-[#FDFBF7]/60 mb-4">
-              Select Payment Method
+              {isChineseMode ? "请选择支付方式" : "Select Payment Method"}
             </p>
 
             {/* 国内支付 - 微信/支付宝 */}
@@ -145,10 +159,10 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
                   {/* 文字 */}
                   <div className="text-left">
                     <span className="text-base font-medium text-white tracking-wide">
-                      WeChat / Alipay
+                      {isChineseMode ? "微信 / 支付宝" : "WeChat / Alipay"}
                     </span>
                     <p className="text-xs text-white/70 mt-0.5">
-                      Powered by Afdian
+                      {isChineseMode ? "爱发电支持" : "Powered by Afdian"}
                     </p>
                   </div>
                 </div>
@@ -201,7 +215,7 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
                       Credit Card / PayPal
                     </span>
                     <p className="text-xs text-white/70 mt-0.5">
-                      Powered by Patreon
+                      {isChineseMode ? "Patreon 支持" : "Powered by Patreon"}
                     </p>
                   </div>
                 </div>
@@ -357,7 +371,10 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
             <CreditCard className="w-3.5 h-3.5 text-[#D4AF37]" />
           </div>
           <p className="text-xs text-[#D4AF37]/80 leading-relaxed pt-1.5">
-            After payment, your Pro status will be activated automatically within 1 minute. Contact support if you have any questions.
+            {isChineseMode 
+              ? "支付完成后，系统将在 1 分钟内自动为您点亮 Pro 状态。如有问题请联系客服。"
+              : "After payment, your Pro status will be activated automatically within 1 minute. Contact support if you have any questions."
+            }
           </p>
         </div>
       </div>

@@ -698,25 +698,26 @@ export default function PracticeContent() {
   const lastFetchTimeRef = useRef(0)
   const FETCH_DEBOUNCE_MS = 1000 // 1秒内禁止重复请求
 
-  // 【修复】从 mock_exams 表获取试卷列表 - 使用 ref 避免循环依赖
+  // 【修复】从 API 路由获取试卷列表 - 绕过 GFW 阻断
   const fetchExams = useCallback(async (type: string) => {
     setExamsLoading(true)
     console.log('[Dashboard] 开始获取试卷列表，当前分类:', type)
     
     try {
-      const { data, error } = await supabase
-        .from('mock_exams')
-        .select('*')
-        .eq('exam_type', type)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('[Dashboard] 获取试卷列表失败:', error)
+      // 通过内部 API 路由获取数据，绕过 GFW 阻断
+      const response = await fetch(`/api/practice/exams?type=${encodeURIComponent(type)}`)
+      const result = await response.json()
+      
+      if (!response.ok) {
+        console.error('[Dashboard] API 返回错误:', result.error)
         setExams([])
-      } else {
-        console.log('[Dashboard] 获取到试卷:', data?.length || 0, '条')
-        // 【修复】转换 mock_exams 数据格式以匹配 exams 表格式
-        const formattedExams = (data || []).map((exam: any) => ({
+        return
+      }
+      
+      if (result.data && result.data.length > 0) {
+        console.log('[Dashboard] 获取到试卷:', result.data.length, '条')
+        // 转换数据格式
+        const formattedExams = result.data.map((exam: any) => ({
           id: exam.id,
           title: `${exam.exam_type} 模拟试卷`,
           description: `包含 ${exam.sections?.length || 0} 个部分的模拟试卷`,
@@ -725,23 +726,23 @@ export default function PracticeContent() {
           is_active: true,
           created_at: exam.created_at,
           updated_at: exam.updated_at,
-          // 保留原始数据供详情页使用
           sections: exam.sections,
           questions: exam.questions
         }))
         setExams(formattedExams)
-        // 如果有试卷数据，设置 hasExamData 为 true
-        if (data && data.length > 0) {
-          setHasExamData(true)
-        }
+        setHasExamData(true)
+      } else {
+        console.log('[Dashboard] 没有找到试卷数据')
+        setExams([])
       }
     } catch (err) {
       console.error('[Dashboard] 获取试卷列表异常:', err)
       setExams([])
+      toast.error('网络拥堵，请稍后重试')
     } finally {
       setExamsLoading(false)
     }
-  }, [supabase]) // 【修复】添加 supabase 依赖
+  }, [toast])
 
   // 【修复】组件挂载时和 currentType 变化时获取试卷列表
   useEffect(() => {
@@ -834,19 +835,24 @@ export default function PracticeContent() {
     
     try {
 
-      // 并行获取：本地存储数据 + 检查试卷数据
+      // 并行获取：本地存储数据 + 检查试卷数据（使用 API 绕过 GFW）
       const [localStreak, localInkDrops, examDataResult] = await Promise.all([
         Promise.resolve(loadFromStorage(STORAGE_KEYS.STREAK, 0)),
         Promise.resolve(loadFromStorage(STORAGE_KEYS.INK_DROPS, 0)),
-        // 检查是否有试卷数据（支持 questions 或 sections 字段）
-        supabase
-          .from('mock_exams')
-          .select('*')
-          .eq('exam_type', type) // 【修复】使用局部变量 type
-          .order('created_at', { ascending: false })
+        // 通过 API 路由检查试卷数据，绕过 GFW 阻断
+        (async () => {
+          try {
+            const response = await fetch(`/api/practice/exams?type=${encodeURIComponent(type)}`)
+            const result = await response.json()
+            return result
+          } catch (error) {
+            console.error('[Dashboard] API 请求失败:', error)
+            return { success: false, data: [] }
+          }
+        })()
       ])
       
-      // 判断是否有有效试卷数据（支持 questions 或 sections 字段）
+      // 判断是否有有效试卷数据
       const isValidExam = (exam: any) => {
         const hasQuestions = exam.questions && exam.questions.length > 0
         const hasSections = exam.sections && 
