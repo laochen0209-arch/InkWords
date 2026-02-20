@@ -63,7 +63,7 @@ export function DualCheckoutPanel({ userId, planType, price }: DualCheckoutPanel
     if (typeof window !== "undefined") {
       if (selectedMethod === "domestic") {
         // 爱发电支付链接
-        const afdianUrl = `https://afdian.net/a/inkwords?remark=${userId}`
+        const afdianUrl = `https://afdian.com/a/inkwords?remark=${userId}`
         window.open(afdianUrl, "_blank")
       } else if (selectedMethod === "international") {
         // Patreon 支付链接
