@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { TRANSLATIONS } from "@/lib/i18n"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
 
 // 水墨风格空状态组件
 interface EmptyStateProps {
@@ -649,6 +650,7 @@ export default function PracticeContent() {
   const searchParams = useSearchParams()
   const { learningMode, uiLanguage, switchMode, switchUiLanguage, targetLang } = useLanguage()
   const { user: authUser, isLoading: authLoading } = useAuth()
+  const { toast } = useToast()
   const t = TRANSLATIONS[learningMode]
 
   // 【修复】获取目标语言，用于过滤考试类型
