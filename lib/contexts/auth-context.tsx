@@ -5,21 +5,18 @@
  * @description 认证上下文 - 管理用户登录状态和会话
  * @author InkWords Team
  * @date 2026-02-14
+ * @version 2.0.0 - 重构为 API 调用模式，绕过 GFW 阻断
  * 
  * 核心设计原则：
  * 1. 简化初始化逻辑，避免复杂的 ref 和依赖数组问题
- * 2. 使用 supabase.auth.getSession() 获取当前会话
- * 3. 严格区分 "加载中"、"已登录"、"未登录" 三种状态
- * 4. 生产环境移除 console.log，优化性能
+ * 2. 使用 supabase.auth.getSession() 获取当前会话（Auth 必须保留）
+ * 3. 用户资料获取改为调用 /api/user/profile（绕过 GFW）
+ * 4. 严格区分 "加载中"、"已登录"、"未登录" 三种状态
  */
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { supabase, cleanupLegacyStorage } from "@/lib/supabase"
 import { cache } from "@/lib/cache"
-
-// ============================================================================
-// 类型定义
-// ============================================================================
 
 interface User {
   id: string
@@ -51,15 +48,7 @@ type AuthState =
   | { status: 'authenticated'; user: User }
   | { status: 'unauthenticated'; user: null }
 
-// ============================================================================
-// Context 创建
-// ============================================================================
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-// ============================================================================
-// 辅助函数
-// ============================================================================
 
 /**
  * VIP 判定辅助函数（大小写不敏感）
@@ -70,10 +59,8 @@ export function checkIsVip(
   currentPeriodEnd: string | null | undefined = null,
   isPro: boolean | null | undefined = false
 ): boolean {
-  // 【调试】输出判断参数
   console.log("[checkIsVip Debug] isPro:", isPro, "subscriptionStatus:", subscriptionStatus)
 
-  // 如果 is_pro 为 true，直接判定为 VIP
   if (isPro === true) {
     console.log("[checkIsVip Debug] VIP by is_pro")
     return true
@@ -87,7 +74,6 @@ export function checkIsVip(
     return false
   }
 
-  // 检查会员是否已过期
   if (currentPeriodEnd) {
     const expiryDate = new Date(currentPeriodEnd)
     const now = new Date()
@@ -96,14 +82,9 @@ export function checkIsVip(
     return isValid
   }
 
-  // 如果没有设置到期时间，视为有效会员
   console.log("[checkIsVip Debug] VIP by status (no expiry)")
   return true
 }
-
-// ============================================================================
-// Provider 组件
-// ============================================================================
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({ status: 'loading', user: null })
@@ -119,14 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return JSON.parse(cached)
       }
     } catch {
-      // 忽略解析错误
     }
     return null
   }
 
   /**
    * 缓存用户资料到 localStorage
-   * 【修复】添加 is_pro 字段到缓存
    */
   const cacheUserProfile = (user: User) => {
     if (typeof window === 'undefined') return
@@ -140,14 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         is_pro: user.is_pro
       }))
     } catch {
-      // 忽略存储错误
     }
   }
 
   /**
    * 从会话创建基础用户数据（快速响应）
-   * 【修复】使用 localStorage 缓存的 VIP 状态避免闪烁
-   * 【修复】添加 is_pro 字段
    */
   const createBaseUser = (authUser: any): User => {
     const cached = getCachedUserProfile()
@@ -169,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * 获取用户完整资料（后台异步加载）
+   * @version 2.0.0 - 通过 API 路由获取，绕过 GFW 阻断
    */
   const fetchUserProfile = async (authUser: any, updateState: boolean = false): Promise<User | null> => {
     const cacheKey = `user_profile_${authUser.id}`
@@ -179,26 +156,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return cachedUser
       }
 
-      const { data: userData, error } = await supabase
-        .from("users")
-        .select("name, avatar, subscription_status, points, current_period_end, study_daily_count, library_daily_count, practice_tickets, streak, is_pro")
-        .eq("id", authUser.id)
-        .single()
-
-      if (error) {
-        console.error("[Auth] 获取用户资料失败:", error)
+      console.log('[Auth] 通过 API 获取用户资料...')
+      
+      const response = await fetch('/api/user/profile')
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[Auth] 获取用户资料失败:", errorData)
         return null
       }
 
-      // 【调试】输出原始数据
-      console.log("[Auth Debug] userData from DB:", userData)
+      const result = await response.json()
+
+      if (!result.success || !result.data) {
+        console.error("[Auth] 用户资料数据格式错误")
+        return null
+      }
+
+      const userData = result.data
+
+      console.log("[Auth Debug] userData from API:", userData)
       console.log("[Auth Debug] is_pro value:", userData?.is_pro)
-      console.log("[Auth Debug] is_pro type:", typeof userData?.is_pro)
 
       const user: User = {
         id: authUser.id,
         email: authUser.email || '',
-        // 【修复】优先使用数据库中的 name 和 avatar
         name: userData?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || '墨语学习者',
         avatar: userData?.avatar || authUser.user_metadata?.avatar_url || null,
         subscription_status: userData?.subscription_status || null,
@@ -208,14 +190,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         library_daily_count: userData?.library_daily_count || 0,
         practice_tickets: userData?.practice_tickets || 0,
         streak: userData?.streak || 0,
-        is_pro: userData?.is_pro === true  // 确保只有 true 才是 true
+        is_pro: userData?.is_pro === true
       }
 
       console.log("[Auth Debug] constructed user.is_pro:", user.is_pro)
 
       cache.set(cacheKey, user, 30000)
-      
-      // 【修复】缓存用户资料到 localStorage，避免 VIP 状态闪烁
       cacheUserProfile(user)
       
       if (updateState) {
@@ -224,13 +204,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       return user
     } catch (error) {
+      console.error("[Auth] 获取用户资料异常:", error)
       return null
     }
   }
 
   /**
    * 刷新会话（供外部调用）
-   * 【优化】先用基础用户数据快速响应，再后台加载完整资料
    */
   const refreshSession = async () => {
     try {
@@ -248,12 +228,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cache.delete(`user_profile_${session.user.id}`)
       }
       
-      // 【优化】先用基础用户数据快速响应
       console.log('[Auth Context] 使用基础用户数据快速设置状态')
       const baseUser = createBaseUser(session.user)
       setAuthState({ status: 'authenticated', user: baseUser })
       
-      // 后台异步获取完整用户资料
       console.log('[Auth Context] 后台异步加载完整用户资料...')
       fetchUserProfile(session.user, true)
     } catch (error) {
@@ -263,7 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   /**
-   * 【新增】刷新用户统计数据（学习天数等）
+   * 刷新用户统计数据（学习天数等）
+   * @version 2.0.0 - 通过 API 路由获取，绕过 GFW 阻断
    */
   const refreshUserStats = async () => {
     if (authState.status !== 'authenticated' || !authState.user?.id) {
@@ -271,41 +250,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data: userData, error } = await supabase
-        .from("users")
-        .select("study_daily_count, library_daily_count, practice_tickets, streak, points")
-        .eq("id", authState.user.id)
-        .single()
-
-      if (error) {
-        console.error('[Auth] 刷新用户统计数据失败:', error)
+      console.log('[Auth] 通过 API 刷新用户统计数据...')
+      
+      const response = await fetch('/api/user/stats')
+      
+      if (!response.ok) {
+        console.error('[Auth] 刷新用户统计数据失败')
         return
       }
 
-      if (userData) {
-        setAuthState(prev => {
-          if (prev.status !== 'authenticated') return prev
-          
-          const updatedUser = {
-            ...prev.user,
-            study_daily_count: userData.study_daily_count || 0,
-            library_daily_count: userData.library_daily_count || 0,
-            practice_tickets: userData.practice_tickets || 0,
-            streak: userData.streak || 0,
-            points: userData.points || 0
-          }
-          
-          // 更新缓存
-          cacheUserProfile(updatedUser)
-          
-          return {
-            status: 'authenticated',
-            user: updatedUser
-          }
-        })
-        
-        console.log('[Auth] 用户统计数据已刷新')
+      const result = await response.json()
+
+      if (!result.success || !result.stats) {
+        console.error('[Auth] 用户统计数据格式错误')
+        return
       }
+
+      const userData = result.stats
+
+      setAuthState(prev => {
+        if (prev.status !== 'authenticated') return prev
+        
+        const updatedUser = {
+          ...prev.user,
+          study_daily_count: userData.study_daily_count || 0,
+          library_daily_count: userData.library_daily_count || 0,
+          practice_tickets: userData.practice_tickets || 0,
+          streak: userData.streak || 0,
+          points: userData.points || 0
+        }
+        
+        cacheUserProfile(updatedUser)
+        
+        return {
+          status: 'authenticated',
+          user: updatedUser
+        }
+      })
+      
+      console.log('[Auth] 用户统计数据已刷新')
     } catch (error) {
       console.error('[Auth] 刷新用户统计数据时发生错误:', error)
     }
@@ -330,10 +313,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
   }
-
-  // ============================================================================
-  // useEffect：组件挂载时初始化
-  // ============================================================================
   
   useEffect(() => {
     let isMounted = true
@@ -369,13 +348,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         console.log('[Auth Context] 找到有效会话，快速设置认证状态')
-        // 【优化】先用基础用户数据快速响应，立即让用户进入应用
-        // 不需要等待数据库查询完成，提升用户体验
         const baseUser = createBaseUser(session.user)
         setAuthState({ status: 'authenticated', user: baseUser })
         
-        // 【优化】后台异步获取完整用户资料
-        // 用户资料会在获取完成后自动更新，不阻塞初始页面加载
         console.log('[Auth Context] 后台异步加载完整用户资料...')
         fetchUserProfile(session.user, true)
       } catch (error) {
@@ -396,13 +371,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           case 'SIGNED_IN':
             if (session?.user) {
               console.log('[Auth Context] 检测到 SIGNED_IN 事件，用户已登录')
-              // 【优化】先用基础用户数据快速响应，立即设置 authenticated 状态
-              // 这样用户跳转后可以立即看到页面，不需要等待完整用户资料
               const baseUser = createBaseUser(session.user)
               setAuthState({ status: 'authenticated', user: baseUser })
               
-              // 【优化】后台异步获取完整用户资料，不阻塞用户体验
-              // 用户资料会在获取完成后自动更新状态
               console.log('[Auth Context] 后台异步加载完整用户资料...')
               fetchUserProfile(session.user, true)
             }
@@ -436,19 +407,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // ============================================================================
-  // 计算派生状态
-  // ============================================================================
-  
   const isLoading = authState.status === 'loading'
   const isAuthenticated = authState.status === 'authenticated'
   const user = authState.user
   const isVip = checkIsVip(user?.subscription_status, user?.current_period_end, user?.is_pro)
 
-  // ============================================================================
-  // 渲染
-  // ============================================================================
-  
   const value: AuthContextType = {
     user,
     isLoading,
@@ -465,10 +428,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   )
 }
-
-// ============================================================================
-// Hook
-// ============================================================================
 
 export function useAuth() {
   const context = useContext(AuthContext)

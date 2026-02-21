@@ -1,12 +1,12 @@
 /**
  * @file use-dashboard-data.ts
- * @description 用户数据中心数据获取 Hook - 从数据库读取真实数据
+ * @description 用户数据中心数据获取 Hook - 通过 API 路由获取数据
  * @author InkWords Team
  * @date 2026-02-04
+ * @version 2.0.0 - 重构为 API 调用模式，绕过 GFW 阻断
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { createBrowserClient } from '@/lib/supabase/client'
 import { useDataRefresh } from '@/lib/contexts/data-refresh-context'
 import { useAuth } from '@/lib/contexts/auth-context'
 
@@ -50,8 +50,36 @@ export interface RadarData {
 }
 
 /**
+ * API 响应接口
+ */
+interface ActivitiesApiResponse {
+  success: boolean
+  data: UserActivity[]
+  count: number
+  error?: string
+}
+
+interface StatsApiResponse {
+  success: boolean
+  stats: {
+    study_daily_count: number
+    library_daily_count: number
+    practice_tickets: number
+    streak: number
+    points: number
+    is_pro: boolean
+    subscription_status: string | null
+    current_period_end: string | null
+    last_reset_date: string | null
+  }
+  error?: string
+}
+
+/**
  * 使用用户数据中心数据的 Hook
  * 支持实时刷新，配合 useDataRefresh 使用
+ * 
+ * @version 2.0.0 - 重构为 API 调用模式
  * @returns 统计数据、活动记录、加载状态等
  */
 export function useDashboardData() {
@@ -68,13 +96,12 @@ export function useDashboardData() {
   const [error, setError] = useState<string | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
 
-  const supabase = createBrowserClient()
   const { refreshTrigger } = useDataRefresh()
   const { user, isAuthenticated } = useAuth()
 
   /**
    * 获取仪表板数据
-   * 从数据库获取最新的用户学习数据和活动记录
+   * 通过 API 路由获取最新的用户学习数据和活动记录
    */
   const fetchDashboardData = useCallback(async (currentUser: any) => {
     try {
@@ -82,45 +109,34 @@ export function useDashboardData() {
       setLoading(true)
       setError(null)
 
-      // 从 users 表获取用户统计数据
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('study_daily_count, library_daily_count, practice_tickets, last_reset_date, created_at')
-        .eq('id', currentUser.id)
-        .single()
+      const [activitiesRes, statsRes] = await Promise.all([
+        fetch('/api/user/activities?limit=100'),
+        fetch('/api/user/stats')
+      ])
 
-      if (userError) {
-        console.warn('[useDashboardData] 获取用户数据失败:', userError)
+      if (!activitiesRes.ok || !statsRes.ok) {
+        throw new Error('API 请求失败')
       }
 
-      // 获取用户活动记录（最多 100 条）
-      const { data: activitiesData, error: activitiesError } = await supabase
-        .from('user_activities')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(100)
+      const activitiesData: ActivitiesApiResponse = await activitiesRes.json()
+      const statsData: StatsApiResponse = await statsRes.json()
 
-      if (activitiesError) {
-        console.warn('[useDashboardData] 获取活动记录失败:', activitiesError)
+      if (!activitiesData.success || !statsData.success) {
+        throw new Error(activitiesData.error || statsData.error || '数据获取失败')
       }
 
-      const activitiesList = activitiesData || []
+      const activitiesList = activitiesData.data || []
       console.log('[useDashboardData] 获取到', activitiesList.length, '条活动记录')
       setActivities(activitiesList)
 
-      // 计算统计数据
-      calculateStats(activitiesList, userData)
+      calculateStats(activitiesList, statsData.stats)
 
-      // 生成热力图数据
       generateHeatmapData(activitiesList)
 
-      // 生成雷达图数据
       generateRadarData(activitiesList)
 
       console.log('[useDashboardData] 数据获取完成')
     } catch (err: any) {
-      // 忽略请求取消错误
       if (err?.name === 'AbortError' || err?.message?.includes('aborted')) {
         console.log('[useDashboardData] 请求被取消')
         return
@@ -131,7 +147,7 @@ export function useDashboardData() {
       setLoading(false)
       setIsInitialized(true)
     }
-  }, [supabase])
+  }, [])
 
   /**
    * 监听数据刷新事件和用户登录状态
@@ -142,7 +158,6 @@ export function useDashboardData() {
       console.log('[useDashboardData] 检测到用户已登录或数据刷新事件，开始获取数据')
       fetchDashboardData(user)
     } else if (!isAuthenticated && isInitialized) {
-      // 如果用户已登出，清空数据
       setActivities([])
       setStats({
         totalStudyDays: 0,
@@ -159,23 +174,19 @@ export function useDashboardData() {
    * 计算统计数据
    */
   const calculateStats = (activitiesData: UserActivity[], userData: any) => {
-    // 累计学习天数：统计有活动记录的不同日期数
     const uniqueDays = new Set(
       activitiesData.map((a) => a.created_at.split('T')[0])
     )
     const totalStudyDays = uniqueDays.size
 
-    // 已读文章数
     const totalArticlesRead = activitiesData.filter(
       (a) => a.action_type === 'read_article'
     ).length
 
-    // 累计考试次数
     const totalExamsTaken = activitiesData.filter(
       (a) => a.action_type === 'take_exam'
     ).length
 
-    // 掌握单词量
     const totalWordsMastered = activitiesData.filter(
       (a) => a.action_type === 'learn_word'
     ).length
@@ -195,13 +206,11 @@ export function useDashboardData() {
     const today = new Date()
     const heatmap: HeatmapData[] = []
 
-    // 生成过去30天的日期
     for (let i = 29; i >= 0; i--) {
       const date = new Date(today)
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
 
-      // 统计当天的活动数量
       const count = activitiesData.filter((a) =>
         a.created_at.startsWith(dateStr)
       ).length
@@ -219,13 +228,11 @@ export function useDashboardData() {
    * 生成雷达图数据
    */
   const generateRadarData = (activitiesData: UserActivity[]) => {
-    // 获取考试记录
     const examActivities = activitiesData.filter(
       (a) => a.action_type === 'take_exam'
     )
 
     if (examActivities.length === 0) {
-      // 没有考试记录时显示默认值
       setRadarData([
         { subject: '听力', score: 0, fullMark: 100 },
         { subject: '阅读', score: 0, fullMark: 100 },
@@ -234,14 +241,12 @@ export function useDashboardData() {
       return
     }
 
-    // 按考试类型分组计算平均分
     const examTypes = ['listening', 'reading', 'vocabulary']
     const radar: RadarData[] = []
 
     examTypes.forEach((type) => {
       const typeExams = examActivities.filter((a) => {
         const details = a.details || {}
-        // 根据考试类型或section类型判断
         return (
           details.exam_type?.toLowerCase().includes(type) ||
           details.section_type === type
@@ -286,14 +291,10 @@ export function useDashboardData() {
    */
   const refresh = useCallback(() => {
     console.log('[useDashboardData] 手动刷新数据...')
-    const initData = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        fetchDashboardData(session.user)
-      }
+    if (user) {
+      fetchDashboardData(user)
     }
-    initData()
-  }, [fetchDashboardData, supabase.auth])
+  }, [fetchDashboardData, user])
 
   return {
     activities,

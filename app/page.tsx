@@ -1,5 +1,17 @@
 "use client"
 
+/**
+ * @file page.tsx
+ * @description 首页/欢迎页 - 选择学习语言
+ * @author InkWords Team
+ * @date 2026-02-20
+ * @version 2.0.0 - 修复语言逻辑：目标语言与 UI 语言分离
+ *
+ * 核心逻辑：
+ * - 点击"学习中文" → 目标语言设为中文，UI 语言设为英文（老外学中文）
+ * - 点击"学习英文" → 目标语言设为英文，UI 语言设为中文（中国人学英文）
+ */
+
 import { useRouter } from "next/navigation"
 import { BookOpen, Globe, Eye, EyeOff } from "lucide-react"
 import { motion } from "framer-motion"
@@ -13,15 +25,34 @@ const langs = [
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { switchMode } = useLanguage()
+  const { switchMode, switchUiLanguage } = useLanguage()
 
+  /**
+   * 处理语言选择
+   * @param langId - 语言ID："en" 表示学中文，"zh" 表示学英文
+   *
+   * 语言映射逻辑：
+   * - langId="en" → 学习中文（目标语言=中文，UI=英文）
+   * - langId="zh" → 学习英文（目标语言=英文，UI=中文）
+   */
   const handleSelect = (langId: string) => {
-    // 将 id 映射为 LearningMode
-    // "en" 表示学中文（母语英文），"zh" 表示学英文（母语文）
     const learningMode = langId === "en" ? "LEARN_CHINESE" : "LEARN_ENGLISH"
     
-    // 【修复】使用 switchMode 函数来确保所有语言状态正确同步
     switchMode(learningMode)
+    
+    /**
+     * 【关键修复】根据学习模式设置 UI 语言
+     * - 学习中文 → 英文界面（老外能看懂）
+     * - 学习英文 → 中文界面（中国人能看懂）
+     */
+    const uiLang = langId === "en" ? "en" : "zh"
+    switchUiLanguage(uiLang)
+    
+    console.log('[Onboarding] 语言选择:', {
+      learningMode,
+      targetLang: langId === "en" ? "zh" : "en",
+      uiLang
+    })
     
     router.push("/auth")
   }

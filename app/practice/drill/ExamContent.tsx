@@ -782,6 +782,7 @@ export default function ExamContent({ examId }: ExamContentProps) {
         setLoading(false);
       }
     }
+  };
 
   if (loading) return (
     <>

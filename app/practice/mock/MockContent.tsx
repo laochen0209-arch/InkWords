@@ -3,11 +3,10 @@
 /**
  * @file MockContent.tsx
  * @description 模拟考试内容组件 - 包含所有客户端逻辑
- * @version 2.1.0 - 添加 URL + LocalStorage 状态持久化
+ * @version 3.0.0 - 重构为 API 调用模式，绕过 GFW 阻断
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -24,7 +23,6 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-// LocalStorage keys
 const STORAGE_KEYS = {
   MOCK_EXAM_TYPE: 'inkwords_mock_exam_type'
 }
@@ -44,12 +42,13 @@ interface MockExam {
   title_en: string;
   rewritten_content: string;
   questions: any[];
-  sections: any[];  // N8N 生成的数据格式
+  sections: any[];
   exam_type: string;
 }
 
 /**
  * 模拟考试内容组件
+ * @version 3.0.0 - 重构为 API 调用模式
  * @returns JSX.Element
  */
 export default function MockContent() {
@@ -57,7 +56,6 @@ export default function MockContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // 从 URL 或 LocalStorage 获取初始状态
   const getInitialType = useCallback(() => {
     const urlType = searchParams.get("type")
     return urlType || loadFromStorage(STORAGE_KEYS.MOCK_EXAM_TYPE, "IELTS")
@@ -66,6 +64,7 @@ export default function MockContent() {
   const [currentType, setCurrentType] = useState(getInitialType)
   const [exam, setExam] = useState<MockExam | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
@@ -77,9 +76,7 @@ export default function MockContent() {
    * @param newType - 新的考试类型
    */
   const handleSwitch = useCallback((newType: string) => {
-    // 保存到 LocalStorage
     localStorage.setItem(STORAGE_KEYS.MOCK_EXAM_TYPE, JSON.stringify(newType))
-    // 更新 URL 并导航
     const params = new URLSearchParams(searchParams.toString());
     params.set("type", newType);
     console.log("Switching to:", newType);
@@ -88,33 +85,37 @@ export default function MockContent() {
 
   /**
    * 获取考试数据
+   * 通过 API 路由获取数据，绕过 GFW 阻断
    */
   async function fetchExam() {
     try {
       setLoading(true);
+      setError(null);
       setIsSubmitted(false);
       setUserAnswers({});
       setScore(0);
 
       console.log('[Mock] 开始获取试卷，类型:', currentType);
 
-      // 使用简单查询获取所有该类型的试卷
-      const { data: allExams, error: fetchError } = await supabase
-        .from("mock_exams")
-        .select("*")
-        .eq("exam_type", currentType)
-        .order("created_at", { ascending: false });
+      const response = await fetch(`/api/practice/exams?type=${currentType}`);
 
-      if (fetchError) {
-        console.error("[Mock] 获取试卷失败:", fetchError);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || '网络请求失败');
+      }
+
+      const result = await response.json();
+
+      if (!result.success || !result.data || result.data.length === 0) {
+        console.log('[Mock] 没有找到试卷');
         setExam(null);
         setLoading(false);
         return;
       }
 
-      // 判断有效试卷：只要有 questions 或 sections 任一字段有内容即可
+      const allExams = result.data;
+
       const isValidExam = (exam: any) => {
-        // 检查旧格式 questions
         let hasQuestions = false;
         if (exam.questions) {
           try {
@@ -124,13 +125,12 @@ export default function MockContent() {
             hasQuestions = false;
           }
         }
-        
-        // 检查新格式 sections
+
         let hasSections = false;
         if (exam.sections) {
           try {
             const secs = typeof exam.sections === 'string' ? JSON.parse(exam.sections) : exam.sections;
-            hasSections = Array.isArray(secs) && secs.length > 0 && 
+            hasSections = Array.isArray(secs) && secs.length > 0 &&
               secs.some((s: any) => {
                 try {
                   const qs = typeof s.questions === 'string' ? JSON.parse(s.questions) : s.questions;
@@ -143,11 +143,10 @@ export default function MockContent() {
             hasSections = false;
           }
         }
-        
+
         return hasQuestions || hasSections;
       };
 
-      // 过滤出有效试卷
       const validExams = (allExams || []).filter(isValidExam);
 
       if (validExams.length === 0) {
@@ -157,20 +156,16 @@ export default function MockContent() {
         return;
       }
 
-      // 随机选择一份试卷
       const randomIndex = Math.floor(Math.random() * validExams.length);
       const data = validExams[randomIndex];
       console.log('[Mock] 选中试卷ID:', data.id);
 
-      // 创建一份试卷数据副本，避免修改原始数据
       const examData = { ...data };
 
-      // 兼容 N8N 生成的数据格式（sections 有数据但 questions 为 null）
       if ((!examData.questions || examData.questions.length === 0) && examData.sections) {
         console.log('[Mock] 检测到 sections 格式数据，正在转换...');
-        
+
         try {
-          // 解析 sections
           let sections: any[] = [];
           if (typeof examData.sections === 'string') {
             sections = JSON.parse(examData.sections);
@@ -183,9 +178,8 @@ export default function MockContent() {
             sections = [];
           }
 
-          // 从 sections 中提取所有 questions，并处理嵌套的 JSON
           const allQuestions: any[] = [];
-          
+
           sections.forEach((section: any, sectionIndex: number) => {
             if (!section || typeof section !== 'object') {
               console.warn('[Mock] 跳过无效的 section:', section);
@@ -194,7 +188,6 @@ export default function MockContent() {
 
             let sectionQuestions: any[] = [];
             try {
-              // 解析 section 内的 questions
               if (typeof section.questions === 'string') {
                 sectionQuestions = JSON.parse(section.questions);
               } else if (Array.isArray(section.questions)) {
@@ -210,14 +203,12 @@ export default function MockContent() {
               return;
             }
 
-            // 清洗每个 question 数据
             sectionQuestions.forEach((q: any, qIndex: number) => {
               if (!q || typeof q !== 'object') {
                 console.warn('[Mock] 跳过无效的 question:', q);
                 return;
               }
 
-              // 解析 options（如果是 JSON 字符串）
               let options: any[] = [];
               try {
                 if (typeof q.options === 'string') {
@@ -230,8 +221,7 @@ export default function MockContent() {
                 options = [];
               }
 
-              // 确保 options 是字符串数组
-              const safeOptions = Array.isArray(options) 
+              const safeOptions = Array.isArray(options)
                 ? options.map((opt: any) => {
                     if (opt === null || opt === undefined) return '';
                     if (typeof opt === 'object') return JSON.stringify(opt);
@@ -239,7 +229,6 @@ export default function MockContent() {
                   }).filter((s: string) => s.trim() !== '')
                 : [];
 
-              // 创建清洗后的 question 对象
               const cleanQuestion = {
                 ...q,
                 stem: q.stem ? String(q.stem) : (q.content ? String(q.content) : '题目内容缺失'),
@@ -259,9 +248,8 @@ export default function MockContent() {
           examData.questions = [];
         }
       } else if (examData.questions) {
-        // 如果是旧格式 questions，也需要进行数据清洗
         console.log('[Mock] 检测到旧格式 questions 数据，正在清洗...');
-        
+
         try {
           let questions: any[] = [];
           if (typeof examData.questions === 'string') {
@@ -275,11 +263,9 @@ export default function MockContent() {
             questions = [];
           }
 
-          // 清洗每个 question
           examData.questions = questions.map((q: any) => {
             if (!q || typeof q !== 'object') return null;
 
-            // 解析 options
             let options: any[] = [];
             try {
               if (typeof q.options === 'string') {
@@ -316,8 +302,9 @@ export default function MockContent() {
       }
 
       setExam(examData);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Mock] Error:", err);
+      setError(err.message || '数据加载失败，请稍后重试');
       setExam(null);
     } finally {
       setLoading(false);
@@ -343,8 +330,15 @@ export default function MockContent() {
     setIsSubmitted(true);
   };
 
+  /**
+   * 重试加载
+   */
+  const handleRetry = () => {
+    fetchExam();
+  };
+
   if (loading) return (
-    <div 
+    <div
       className="flex h-screen items-center justify-center"
       style={{ backgroundImage: "url('/bg3.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}
     >
@@ -353,8 +347,29 @@ export default function MockContent() {
     </div>
   );
 
+  if (error) return (
+    <div
+      className="flex h-screen flex-col items-center justify-center space-y-4"
+      style={{ backgroundImage: "url('/bg3.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+    >
+      <div className="rounded-full bg-red-100 p-4">
+        <FileText className="h-8 w-8 text-red-500" />
+      </div>
+      <h2 className="text-xl font-bold text-slate-800">数据加载失败</h2>
+      <p className="text-slate-500">{error}</p>
+      <div className="flex gap-3">
+        <Button onClick={handleRetry} variant="outline">
+          重试
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/practice">返回大厅</Link>
+        </Button>
+      </div>
+    </div>
+  );
+
   if (!exam) return (
-    <div 
+    <div
       className="flex h-screen flex-col items-center justify-center space-y-4"
       style={{ backgroundImage: "url('/bg3.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}
     >
@@ -370,7 +385,7 @@ export default function MockContent() {
   );
 
   return (
-    <div 
+    <div
       className="min-h-screen p-4 lg:p-8 font-sans"
       style={{ backgroundImage: "url('/bg3.png')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}
     >
@@ -406,12 +421,9 @@ export default function MockContent() {
         </div>
         <div className="flex items-center gap-3">
           {isSubmitted && <span className="text-lg font-bold text-amber-600">Score: {score}</span>}
-          {/* 计算题目总数 */}
           <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-mono border border-slate-200">
             {(() => {
-              // 优先使用已经转换好的 questions 长度
               if (exam?.questions?.length) return exam.questions.length;
-              // 如果没有，尝试从 sections 计算
               if (exam?.sections) {
                 try {
                   const sections = typeof exam.sections === 'string' ? JSON.parse(exam.sections) : exam.sections;
@@ -435,7 +447,7 @@ export default function MockContent() {
         </div>
       </header>
       <div className="grid gap-8 lg:grid-cols-12 items-start relative">
-        
+
         <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
           <Card className="shadow-sm border-slate-200 bg-white">
             <div className="p-6 lg:p-8">
@@ -455,14 +467,13 @@ export default function MockContent() {
         </div>
 
         <div className="lg:col-span-7 space-y-6 pb-20">
-          {/* 检查是否有题目 */}
           {exam.questions && exam.questions.length > 0 ? (
             exam.questions.map((q: any, index: number) => {
               if (!q) return null;
               const userAnswer = userAnswers[index];
               const correctTag = q.answer?.trim().toUpperCase();
               const isMCQ = q.options && q.options.length > 0;
-              
+
               let statusColor = "border-slate-200 bg-white";
               if (isSubmitted) {
                 const answerStr = userAnswer || "";
@@ -514,7 +525,6 @@ export default function MockContent() {
               );
             }).filter(Boolean)
           ) : (
-            /* 如果没有题目，显示错误信息 */
             <Card className="p-8 text-center">
               <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <h3 className="text-lg font-bold text-slate-700 mb-2">暂无题目</h3>
