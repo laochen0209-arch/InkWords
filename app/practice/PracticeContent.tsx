@@ -740,7 +740,11 @@ export default function PracticeContent() {
     } catch (err) {
       console.error('[Dashboard] 获取试卷列表异常:', err)
       setExams([])
-      toast.error('网络拥堵，请稍后重试')
+      toast({
+        variant: "destructive",
+        title: "出错了",
+        description: "网络拥堵，请稍后重试",
+      })
     } finally {
       setExamsLoading(false)
     }
