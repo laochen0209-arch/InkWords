@@ -445,7 +445,25 @@ export default function ExamContent({ examId }: ExamContentProps) {
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(transcript);
-    utterance.lang = transcript.match(/[\u4e00-\u9fa5]/) ? 'zh-CN' : 'en-US';
+    
+    // 【修复】根据考试类型判断语言，而不是根据文本内容
+    const chineseExams = ['HSK', 'BCT', 'TOCFL'];
+    const isChineseExam = chineseExams.includes(currentType);
+    utterance.lang = isChineseExam ? 'zh-CN' : 'en-US';
+    
+    // 尝试设置合适的语音
+    const voices = window.speechSynthesis.getVoices();
+    const targetVoice = voices.find(v => 
+      isChineseExam 
+        ? v.lang.startsWith('zh') && (v.name.includes('Female') || v.name.includes('女'))
+        : v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Google US English') || v.name.includes('Samantha') || v.name.includes('Victoria'))
+    ) || voices.find(v => 
+      isChineseExam ? v.lang.startsWith('zh') : v.lang.startsWith('en')
+    );
+    if (targetVoice) {
+      utterance.voice = targetVoice;
+    }
+    
     utterance.rate = 0.9;
     
     utterance.onend = () => {
@@ -456,7 +474,7 @@ export default function ExamContent({ examId }: ExamContentProps) {
     isPlayingRef.current = true;
     setPlayingSection(sectionType);
     window.speechSynthesis.speak(utterance);
-  }, [playingSection]);
+  }, [playingSection, currentType]);
 
   useEffect(() => () => window.speechSynthesis.cancel(), []);
 
