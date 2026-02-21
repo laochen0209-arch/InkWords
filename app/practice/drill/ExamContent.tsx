@@ -712,7 +712,7 @@ export default function ExamContent({ examId }: ExamContentProps) {
         const allExams = result.data || []
         
         // 过滤掉当前试卷，避免重复
-        const availableExams = allExams.filter(e => e.id !== exam?.id) || allExams
+        const availableExams = allExams.filter((e: { id: string }) => e.id !== exam?.id) || allExams
         
         // 随机选择一套试卷
         const examsToChoose = availableExams?.length > 0 ? availableExams : allExams
