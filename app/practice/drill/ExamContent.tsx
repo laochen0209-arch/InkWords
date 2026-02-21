@@ -781,6 +781,10 @@ export default function ExamContent({ examId }: ExamContentProps) {
         setIsSubmittingPractice(false);
         setLoading(false);
       }
+    } catch (error: any) {
+      console.error('[Exam] 消耗练习券失败:', error);
+      setIsSubmittingPractice(false);
+      setLoading(false);
     }
   };
 
